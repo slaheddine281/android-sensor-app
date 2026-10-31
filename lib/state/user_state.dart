@@ -3,7 +3,10 @@ import '../models/app_user.dart';
 import '../data/mock_users.dart';
 
 class UserState extends ChangeNotifier {
-  final List<AppUser> _users = List<AppUser>.from(initialMockUsers);
+  final List<AppUser> _users;
+
+  UserState({List<AppUser>? initialUsers})
+      : _users = List<AppUser>.from(initialUsers ?? initialMockUsers);
 
   List<AppUser> get allUsers => List.unmodifiable(_users);
 

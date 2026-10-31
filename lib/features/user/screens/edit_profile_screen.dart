@@ -28,17 +28,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final user = context.auth.currentUser ?? context.users.allUsers.first;
-    _nameController = TextEditingController(text: user.fullName);
-    _emailController = TextEditingController(text: user.email);
-    _selectedBirthDate = user.birthDate ?? DateTime(2003, 1, 12);
+    final user = context.auth.currentUser ??
+        (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
+    _nameController = TextEditingController(text: user?.fullName ?? '');
+    _emailController = TextEditingController(text: user?.email ?? '');
+    _selectedBirthDate = user?.birthDate ?? DateTime(2003, 1, 12);
     _birthDateController = TextEditingController(
       text: AppDateFormatter.formatShort(_selectedBirthDate),
     );
     _heightController =
-        TextEditingController(text: '${user.heightCm ?? 170}');
+        TextEditingController(text: '${user?.heightCm ?? 170}');
     _weightController =
-        TextEditingController(text: '${user.weightKg?.toInt() ?? 65}');
+        TextEditingController(text: '${user?.weightKg?.toInt() ?? 65}');
   }
 
   @override
@@ -87,8 +88,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _isLoading = true;
     });
 
-    final currentUser =
-        context.auth.currentUser ?? context.users.allUsers.first;
+    final currentUser = context.auth.currentUser ??
+        (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
+    if (currentUser == null) return;
 
     final updated = currentUser.copyWith(
       fullName: _nameController.text.trim(),
@@ -122,7 +124,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = context.auth.currentUser ?? context.users.allUsers.first;
+    final user = context.auth.currentUser ??
+        (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.navyDark : Colors.white,
+        appBar: const AppAppBar(title: 'Modifier mon profil'),
+        body: const Center(child: Text('Veuillez vous connecter.')),
+      );
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : Colors.white,

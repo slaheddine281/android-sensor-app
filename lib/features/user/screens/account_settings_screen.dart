@@ -108,7 +108,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                      'Mot de passe mis à jour avec succès (mode démo local).'),
+                      'Mot de passe mis à jour avec succès.'),
                   backgroundColor: AppColors.secondary,
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -194,7 +194,21 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final settings = context.settings;
-    final user = context.auth.currentUser ?? context.users.allUsers.first;
+    final user = context.auth.currentUser ??
+        (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
+
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
+        appBar: const AppAppBar(
+          title: 'Paramètres du compte',
+          showBackButton: false,
+        ),
+        body: const Center(
+          child: Text('Veuillez vous connecter pour accéder aux paramètres.'),
+        ),
+      );
+    }
 
     final biometricSummary = user.biometricFingerprintEnabled &&
             user.biometricFaceEnabled

@@ -4,12 +4,63 @@ import 'package:stepquest/state/auth_state.dart';
 import 'package:stepquest/state/notification_state.dart';
 import 'package:stepquest/state/user_state.dart';
 
+final List<AppUser> _testUsers = [
+  AppUser(
+    id: 'u1',
+    fullName: 'Amine Ben Ali',
+    email: 'amine@example.com',
+    role: UserRole.user,
+    status: UserStatus.active,
+    createdAt: DateTime(2024, 10, 12),
+  ),
+  AppUser(
+    id: 'u2',
+    fullName: 'Sara Meftah',
+    email: 'sara@example.com',
+    role: UserRole.user,
+    status: UserStatus.active,
+    createdAt: DateTime(2024, 9, 28),
+  ),
+  AppUser(
+    id: 'u3',
+    fullName: 'Lina Khaled',
+    email: 'lina@example.com',
+    role: UserRole.user,
+    status: UserStatus.suspended,
+    createdAt: DateTime(2024, 7, 20),
+  ),
+  AppUser(
+    id: 'u4',
+    fullName: 'Omar Saidi',
+    email: 'omar@example.com',
+    role: UserRole.user,
+    status: UserStatus.active,
+    createdAt: DateTime(2024, 10, 5),
+  ),
+  AppUser(
+    id: 'u5',
+    fullName: 'Youssef Trabelsi',
+    email: 'youssef@stepquest.com',
+    role: UserRole.admin,
+    status: UserStatus.active,
+    createdAt: DateTime(2024, 8, 15),
+  ),
+  AppUser(
+    id: 'u6',
+    fullName: 'Admin Principal',
+    email: 'admin@stepquest.com',
+    role: UserRole.admin,
+    status: UserStatus.active,
+    createdAt: DateTime(2024, 1, 1),
+  ),
+];
+
 void main() {
   group('StepQuest User Management & CRUD Tests', () {
     late UserState userState;
 
     setUp(() {
-      userState = UserState();
+      userState = UserState(initialUsers: _testUsers);
     });
 
     test('Initial mock users are properly populated', () {
@@ -90,7 +141,7 @@ void main() {
     late NotificationState notificationState;
 
     setUp(() {
-      userState = UserState();
+      userState = UserState(initialUsers: _testUsers);
       authState = AuthState();
       notificationState = NotificationState();
     });

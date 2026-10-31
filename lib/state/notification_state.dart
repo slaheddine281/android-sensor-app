@@ -3,8 +3,11 @@ import '../models/user_notification.dart';
 import '../data/mock_notifications.dart';
 
 class NotificationState extends ChangeNotifier {
-  final List<UserNotification> _notifications =
-      List<UserNotification>.from(initialMockNotifications);
+  final List<UserNotification> _notifications;
+
+  NotificationState({List<UserNotification>? initialNotifications})
+      : _notifications = List<UserNotification>.from(
+            initialNotifications ?? initialMockNotifications);
 
   List<UserNotification> get notifications => List.unmodifiable(_notifications);
 

@@ -36,7 +36,17 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = context.auth.currentUser ?? context.users.allUsers.first;
+    final user = context.auth.currentUser ??
+        (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
+
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
+        body: const Center(
+          child: Text('Veuillez vous connecter.'),
+        ),
+      );
+    }
     final unreadCount = context.notifications.unreadCount;
 
     return Scaffold(

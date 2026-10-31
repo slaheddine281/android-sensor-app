@@ -53,7 +53,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = context.auth.currentUser ?? context.users.allUsers.first;
+    final user = context.auth.currentUser ??
+        (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
+
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
+        body: const Center(
+          child: Text('Veuillez vous connecter pour voir votre profil.'),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,

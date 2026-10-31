@@ -114,7 +114,26 @@ class AppUser {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toMap({bool snakeCase = true}) {
+    if (snakeCase) {
+      return {
+        'id': id,
+        'full_name': fullName,
+        'email': email,
+        'avatar_url': avatarUrl,
+        'role': role.name,
+        'status': status.name,
+        'created_at': createdAt.toIso8601String(),
+        'last_login_at': lastLoginAt?.toIso8601String(),
+        'biometric_fingerprint_enabled': biometricFingerprintEnabled,
+        'biometric_face_enabled': biometricFaceEnabled,
+        'height_cm': heightCm,
+        'weight_kg': weightKg,
+        'birth_date': birthDate?.toIso8601String(),
+        'level': level,
+        'device_info': deviceInfo,
+      };
+    }
     return {
       'id': id,
       'fullName': fullName,
@@ -136,27 +155,33 @@ class AppUser {
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
-      id: map['id'] as String,
-      fullName: map['fullName'] as String,
-      email: map['email'] as String,
-      avatarUrl: map['avatarUrl'] as String?,
-      role: UserRole.fromString(map['role'] as String? ?? 'user'),
-      status: UserStatus.fromString(map['status'] as String? ?? 'active'),
-      createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ??
+      id: map['id']?.toString() ?? '',
+      fullName: (map['full_name'] ?? map['fullName'] ?? '') as String,
+      email: (map['email'] ?? '') as String,
+      avatarUrl: (map['avatar_url'] ?? map['avatarUrl']) as String?,
+      role: UserRole.fromString((map['role'] ?? 'user').toString()),
+      status: UserStatus.fromString((map['status'] ?? 'active').toString()),
+      createdAt: DateTime.tryParse(
+              (map['created_at'] ?? map['createdAt'] ?? '').toString()) ??
           DateTime.now(),
-      lastLoginAt: map['lastLoginAt'] != null
-          ? DateTime.tryParse(map['lastLoginAt'] as String)
+      lastLoginAt: (map['last_login_at'] ?? map['lastLoginAt']) != null
+          ? DateTime.tryParse(
+              (map['last_login_at'] ?? map['lastLoginAt']).toString())
           : null,
-      biometricFingerprintEnabled:
-          map['biometricFingerprintEnabled'] as bool? ?? false,
-      biometricFaceEnabled: map['biometricFaceEnabled'] as bool? ?? false,
-      heightCm: map['heightCm'] as int?,
-      weightKg: (map['weightKg'] as num?)?.toDouble(),
-      birthDate: map['birthDate'] != null
-          ? DateTime.tryParse(map['birthDate'] as String)
+      biometricFingerprintEnabled: (map['biometric_fingerprint_enabled'] ??
+              map['biometricFingerprintEnabled']) as bool? ??
+          false,
+      biometricFaceEnabled: (map['biometric_face_enabled'] ??
+              map['biometricFaceEnabled']) as bool? ??
+          false,
+      heightCm: (map['height_cm'] ?? map['heightCm']) as int?,
+      weightKg: ((map['weight_kg'] ?? map['weightKg']) as num?)?.toDouble(),
+      birthDate: (map['birth_date'] ?? map['birthDate']) != null
+          ? DateTime.tryParse(
+              (map['birth_date'] ?? map['birthDate']).toString())
           : null,
-      level: map['level'] as int? ?? 1,
-      deviceInfo: map['deviceInfo'] as String?,
+      level: (map['level'] as int?) ?? 1,
+      deviceInfo: (map['device_info'] ?? map['deviceInfo']) as String?,
     );
   }
 }

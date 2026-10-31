@@ -64,14 +64,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     }
   }
 
-  void _fillAdmin(String email, String password) {
-    setState(() {
-      _emailController.text = email;
-      _passwordController.text = password;
-      _errorText = null;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -201,66 +193,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             fontWeight: FontWeight.w600,
                             color: AppColors.primaryLight,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Predefined demo admin shortcuts
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.navyCard,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFF334155),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'COMPTES ADMINISTRATEURS DE TEST',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF94A3B8),
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          alignment: WrapAlignment.center,
-                          children: [
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: const BorderSide(color: Color(0xFF475569)),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 8),
-                              ),
-                              icon: const Icon(Icons.security, size: 14),
-                              label: const Text('Admin Principal',
-                                  style: TextStyle(fontSize: 12)),
-                              onPressed: () => _fillAdmin(
-                                  'admin@stepquest.com', 'admin123'),
-                            ),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: const BorderSide(color: Color(0xFF475569)),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 8),
-                              ),
-                              icon: const Icon(Icons.person, size: 14),
-                              label: const Text('Youssef Trabelsi',
-                                  style: TextStyle(fontSize: 12)),
-                              onPressed: () => _fillAdmin(
-                                  'youssef@stepquest.com', 'admin123'),
-                            ),
-                          ],
                         ),
                       ],
                     ),

@@ -64,7 +64,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-            'Compte supprimé de l\'état local de démonstration. Aucune donnée distante n\'a été affectée.'),
+            'Votre compte a été supprimé avec succès.'),
         backgroundColor: AppColors.textPrimary,
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: 4),

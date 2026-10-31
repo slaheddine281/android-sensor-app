@@ -88,14 +88,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _fillDemoUser(String email, String password) {
-    setState(() {
-      _emailController.text = email;
-      _passwordController.text = password;
-      _errorText = null;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -310,58 +302,27 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Divider with Admin link
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'ACCÈS RAPIDE DÉMO',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textMuted,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 8),
 
-                  // Demo quick account chips
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      ActionChip(
-                        avatar: const Icon(Icons.person, size: 16),
-                        label: const Text('Amine (Actif)'),
-                        onPressed: () =>
-                            _fillDemoUser('amine@example.com', 'password123'),
+                  // Access to Admin Space
+                  Center(
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.admin_panel_settings_outlined, size: 18),
+                      label: const Text('Accéder à l\'Espace Administrateur'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
+                        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                       ),
-                      ActionChip(
-                        avatar: const Icon(Icons.block, size: 16),
-                        label: const Text('Lina (Suspendu)'),
-                        onPressed: () =>
-                            _fillDemoUser('lina@example.com', 'password123'),
-                      ),
-                      ActionChip(
-                        avatar: const Icon(Icons.admin_panel_settings,
-                            size: 16, color: AppColors.primary),
-                        label: const Text('Espace Admin'),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const AdminLoginScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AdminLoginScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
