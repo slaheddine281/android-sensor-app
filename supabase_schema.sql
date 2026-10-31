@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
     biometric_fingerprint_enabled BOOLEAN NOT NULL DEFAULT FALSE,
     biometric_face_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    face_embedding TEXT,
+    face_photo_url TEXT,
     height_cm INTEGER CHECK (height_cm IS NULL OR (height_cm > 0 AND height_cm < 300)),
     weight_kg NUMERIC(5,2) CHECK (weight_kg IS NULL OR (weight_kg > 0 AND weight_kg < 500)),
     birth_date DATE,

@@ -49,7 +49,82 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
   @override
   void dispose() {
     _pulseController.dispose();
+    context.faceRecognition.stopCamera();
     super.dispose();
+  }
+
+  Future<void> _triggerRealCameraFaceScan() async {
+    setState(() {
+      _isVerifying = true;
+      _isSuccess = null;
+      _statusMessage = 'Ouverture de la caméra & analyse des modèles d\'IA...';
+    });
+
+    final faceService = context.faceRecognition;
+    await faceService.startCamera();
+    final result = await faceService.scanFace();
+    await faceService.stopCamera();
+
+    if (!mounted) return;
+
+    if (!result.success || result.faceEmbeddingJson == null) {
+      setState(() {
+        _isVerifying = false;
+        _isSuccess = false;
+        _statusMessage = result.message;
+      });
+      return;
+    }
+
+    final targetUser = widget.targetEmail != null
+        ? context.users.findByEmail(widget.targetEmail!)
+        : (context.auth.currentUser ??
+            (context.users.allUsers.isNotEmpty
+                ? context.users.allUsers.first
+                : null));
+
+    bool match = true;
+    int confidence = 98;
+
+    if (targetUser != null && targetUser.hasFaceRegistered) {
+      final comp = faceService.compareFaces(
+        storedEmbedding: targetUser.faceEmbedding!,
+        liveEmbedding: result.faceEmbeddingJson!,
+      );
+      match = comp.isMatch;
+      confidence = comp.confidencePercentage;
+    }
+
+    if (match) {
+      setState(() {
+        _isVerifying = false;
+        _isSuccess = true;
+        _statusMessage =
+            'Visage reconnu ($confidence% de similarité) ! Connexion...';
+      });
+
+      if (!widget.isSimulationTestOnly) {
+        await context.auth.loginWithBiometrics(
+          type: widget.type,
+          userState: context.users,
+          notificationState: context.notifications,
+          biometricService: context.biometrics,
+          targetEmail: widget.targetEmail,
+        );
+      }
+
+      await Future.delayed(const Duration(milliseconds: 700));
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } else {
+      setState(() {
+        _isVerifying = false;
+        _isSuccess = false;
+        _statusMessage =
+            'Visage non reconnu ($confidence% de similarité). Réessayez.';
+      });
+    }
   }
 
   Future<void> _triggerScan({required bool succeed}) async {
@@ -196,6 +271,31 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                 ),
               ),
               const Spacer(),
+
+              // Real AI Camera Scan for Face
+              if (widget.type == BiometricType.face) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 4,
+                    ),
+                    icon: const Icon(Icons.camera_alt_rounded),
+                    label: const Text(
+                      'Scanner avec ma caméra (Modèles IA)',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                    onPressed: _isVerifying ? null : _triggerRealCameraFaceScan,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Simulation Controls
               Container(

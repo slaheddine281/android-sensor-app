@@ -10,6 +10,7 @@ import '../../../widgets/status_badge.dart';
 import '../../../widgets/user_avatar.dart';
 import 'account_settings_screen.dart';
 import 'edit_profile_screen.dart';
+import 'face_enrollment_screen.dart';
 import 'login_screen.dart';
 import 'user_home_screen.dart';
 
@@ -269,6 +270,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         ),
                         const Divider(),
                         _buildInfoRow(
+                          icon: Icons.face_retouching_natural_rounded,
+                          label: 'Reconnaissance Faciale',
+                          value: user.hasFaceRegistered
+                              ? 'Configuré (Face ID actif)'
+                              : 'Non configuré',
+                          isDark: isDark,
+                        ),
+                        const Divider(),
+                        _buildInfoRow(
                           icon: Icons.security_outlined,
                           label: 'Biométrie active',
                           value: user.biometricFingerprintEnabled &&
@@ -286,8 +296,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Action Buttons
+                  // Face ID enrollment button
                   AppButton(
+                    label: user.hasFaceRegistered
+                        ? 'Gérer mon visage (Face ID)'
+                        : 'Enregistrer mon visage (Face ID)',
+                    icon: Icons.face_rounded,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const FaceEnrollmentScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Action Buttons
+                  AppButton.secondary(
                     label: 'Modifier mon profil',
                     icon: Icons.edit_outlined,
                     onPressed: () {

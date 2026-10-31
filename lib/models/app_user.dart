@@ -43,6 +43,10 @@ class AppUser {
   final bool biometricFingerprintEnabled;
   final bool biometricFaceEnabled;
 
+  // Reconnaissance Faciale (vecteur de descripteur 128 floats + photo)
+  final String? faceEmbedding;
+  final String? facePhotoUrl;
+
   // Additional profile fields seen in the UI mockups
   final int? heightCm;
   final double? weightKg;
@@ -61,6 +65,8 @@ class AppUser {
     this.lastLoginAt,
     this.biometricFingerprintEnabled = false,
     this.biometricFaceEnabled = false,
+    this.faceEmbedding,
+    this.facePhotoUrl,
     this.heightCm,
     this.weightKg,
     this.birthDate,
@@ -71,6 +77,8 @@ class AppUser {
   bool get isAdmin => role == UserRole.admin;
   bool get isActive => status == UserStatus.active;
   bool get isSuspended => status == UserStatus.suspended;
+  bool get hasFaceRegistered =>
+      faceEmbedding != null && faceEmbedding!.trim().isNotEmpty;
 
   String get firstName {
     final parts = fullName.trim().split(' ');
@@ -88,6 +96,8 @@ class AppUser {
     DateTime? lastLoginAt,
     bool? biometricFingerprintEnabled,
     bool? biometricFaceEnabled,
+    String? faceEmbedding,
+    String? facePhotoUrl,
     int? heightCm,
     double? weightKg,
     DateTime? birthDate,
@@ -106,6 +116,8 @@ class AppUser {
       biometricFingerprintEnabled:
           biometricFingerprintEnabled ?? this.biometricFingerprintEnabled,
       biometricFaceEnabled: biometricFaceEnabled ?? this.biometricFaceEnabled,
+      faceEmbedding: faceEmbedding ?? this.faceEmbedding,
+      facePhotoUrl: facePhotoUrl ?? this.facePhotoUrl,
       heightCm: heightCm ?? this.heightCm,
       weightKg: weightKg ?? this.weightKg,
       birthDate: birthDate ?? this.birthDate,
@@ -127,6 +139,8 @@ class AppUser {
         'last_login_at': lastLoginAt?.toIso8601String(),
         'biometric_fingerprint_enabled': biometricFingerprintEnabled,
         'biometric_face_enabled': biometricFaceEnabled,
+        'face_embedding': faceEmbedding,
+        'face_photo_url': facePhotoUrl,
         'height_cm': heightCm,
         'weight_kg': weightKg,
         'birth_date': birthDate?.toIso8601String(),
@@ -145,6 +159,8 @@ class AppUser {
       'lastLoginAt': lastLoginAt?.toIso8601String(),
       'biometricFingerprintEnabled': biometricFingerprintEnabled,
       'biometricFaceEnabled': biometricFaceEnabled,
+      'faceEmbedding': faceEmbedding,
+      'facePhotoUrl': facePhotoUrl,
       'heightCm': heightCm,
       'weightKg': weightKg,
       'birthDate': birthDate?.toIso8601String(),
@@ -174,6 +190,8 @@ class AppUser {
       biometricFaceEnabled: (map['biometric_face_enabled'] ??
               map['biometricFaceEnabled']) as bool? ??
           false,
+      faceEmbedding: (map['face_embedding'] ?? map['faceEmbedding']) as String?,
+      facePhotoUrl: (map['face_photo_url'] ?? map['facePhotoUrl']) as String?,
       heightCm: (map['height_cm'] ?? map['heightCm']) as int?,
       weightKg: ((map['weight_kg'] ?? map['weightKg']) as num?)?.toDouble(),
       birthDate: (map['birth_date'] ?? map['birthDate']) != null
@@ -185,4 +203,3 @@ class AppUser {
     );
   }
 }
-

@@ -4,6 +4,7 @@ import 'user_state.dart';
 import 'notification_state.dart';
 import 'app_settings_state.dart';
 import '../services/mock_biometric_service.dart';
+import '../services/face_recognition_service.dart';
 
 class AppStateProvider extends InheritedWidget {
   final AuthState authState;
@@ -11,6 +12,7 @@ class AppStateProvider extends InheritedWidget {
   final NotificationState notificationState;
   final AppSettingsState settingsState;
   final MockBiometricService biometricService;
+  final FaceRecognitionService faceService;
 
   const AppStateProvider({
     super.key,
@@ -19,6 +21,7 @@ class AppStateProvider extends InheritedWidget {
     required this.notificationState,
     required this.settingsState,
     required this.biometricService,
+    required this.faceService,
     required super.child,
   });
 
@@ -41,5 +44,6 @@ extension AppStateExtensions on BuildContext {
   AppSettingsState get settings => AppStateProvider.of(this).settingsState;
   MockBiometricService get biometrics =>
       AppStateProvider.of(this).biometricService;
+  FaceRecognitionService get faceRecognition =>
+      AppStateProvider.of(this).faceService;
 }
-

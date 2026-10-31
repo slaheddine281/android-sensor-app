@@ -582,6 +582,8 @@ class AuthState extends ChangeNotifier {
               'biometric_fingerprint_enabled':
                   updatedUser.biometricFingerprintEnabled,
               'biometric_face_enabled': updatedUser.biometricFaceEnabled,
+              'face_embedding': updatedUser.faceEmbedding,
+              'face_photo_url': updatedUser.facePhotoUrl,
             })
             .eq('id', updatedUser.id);
       } catch (e) {

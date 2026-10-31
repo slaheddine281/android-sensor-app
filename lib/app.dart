@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'core/navigation/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'services/mock_biometric_service.dart';
+import 'services/face_recognition_service.dart';
 import 'state/app_settings_state.dart';
 import 'state/app_state_provider.dart';
 import 'state/auth_state.dart';
@@ -21,6 +22,7 @@ class _StepQuestAppState extends State<StepQuestApp> {
   late final NotificationState _notificationState;
   late final AppSettingsState _settingsState;
   late final MockBiometricService _biometricService;
+  late final FaceRecognitionService _faceService;
 
   @override
   void initState() {
@@ -30,6 +32,7 @@ class _StepQuestAppState extends State<StepQuestApp> {
     _notificationState = NotificationState();
     _settingsState = AppSettingsState();
     _biometricService = MockBiometricService();
+    _faceService = FaceRecognitionService();
   }
 
   @override
@@ -49,6 +52,7 @@ class _StepQuestAppState extends State<StepQuestApp> {
       notificationState: _notificationState,
       settingsState: _settingsState,
       biometricService: _biometricService,
+      faceService: _faceService,
       child: ListenableBuilder(
         listenable: Listenable.merge([
           _authState,
@@ -72,4 +76,3 @@ class _StepQuestAppState extends State<StepQuestApp> {
     );
   }
 }
-
