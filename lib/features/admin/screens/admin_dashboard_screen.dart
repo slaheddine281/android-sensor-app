@@ -65,7 +65,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     color: AppColors.primary),
                 title: const Text('Notifications Système'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                onTap: () {
+                onTap: () async {
                   Navigator.of(ctx).pop();
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -78,9 +78,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 leading: const Icon(Icons.logout, color: AppColors.error),
                 title: const Text('Déconnexion Session Admin',
                     style: TextStyle(color: AppColors.error)),
-                onTap: () {
+                onTap: () async {
                   Navigator.of(ctx).pop();
-                  context.auth.signOut();
+                  await context.auth.signOut();
+                  if (!mounted) return;
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                     (route) => false,

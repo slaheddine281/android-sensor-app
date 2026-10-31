@@ -24,22 +24,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   DateTime? _selectedBirthDate;
   bool _isLoading = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    final user = context.auth.currentUser ??
-        (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
-    _nameController = TextEditingController(text: user?.fullName ?? '');
-    _emailController = TextEditingController(text: user?.email ?? '');
-    _selectedBirthDate = user?.birthDate ?? DateTime(2003, 1, 12);
-    _birthDateController = TextEditingController(
-      text: AppDateFormatter.formatShort(_selectedBirthDate),
-    );
-    _heightController =
-        TextEditingController(text: '${user?.heightCm ?? 170}');
-    _weightController =
-        TextEditingController(text: '${user?.weightKg?.toInt() ?? 65}');
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+    _birthDateController = TextEditingController();
+    _heightController = TextEditingController();
+    _weightController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      final user = context.auth.currentUser ??
+          (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
+      _nameController.text = user?.fullName ?? '';
+      _emailController.text = user?.email ?? '';
+      _selectedBirthDate = user?.birthDate ?? DateTime(2003, 1, 12);
+      _birthDateController.text =
+          AppDateFormatter.formatShort(_selectedBirthDate);
+      _heightController.text = '${user?.heightCm ?? 170}';
+      _weightController.text = '${user?.weightKg?.toInt() ?? 65}';
+      _isInitialized = true;
+    }
   }
 
   @override
@@ -81,7 +92,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -100,11 +111,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       weightKg: double.tryParse(_weightController.text.trim()) ?? 65.0,
     );
 
-    context.auth.updateCurrentProfile(
+    await context.auth.updateCurrentProfile(
       updatedUser: updated,
       userState: context.users,
       notificationState: context.notifications,
     );
+
+    if (!mounted) return;
 
     setState(() {
       _isLoading = false;

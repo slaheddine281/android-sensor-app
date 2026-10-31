@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 /// Configuration constants for Supabase integration in StepQuest
 class SupabaseConstants {
   SupabaseConstants._();
@@ -12,5 +14,23 @@ class SupabaseConstants {
   /// Table names
   static const String profilesTable = 'profiles';
   static const String notificationsTable = 'notifications';
-}
 
+  /// Checks if Supabase has been initialized in the current runtime environment
+  static bool get isInitialized {
+    try {
+      Supabase.instance;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Safe accessor to the Supabase client singleton, or null if uninitialized (e.g. during unit tests)
+  static SupabaseClient? get client {
+    try {
+      return Supabase.instance.client;
+    } catch (_) {
+      return null;
+    }
+  }
+}

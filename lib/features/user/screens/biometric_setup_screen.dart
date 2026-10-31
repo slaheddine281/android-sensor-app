@@ -21,16 +21,22 @@ class BiometricSetupScreen extends StatefulWidget {
 }
 
 class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
-  late bool _fingerprintEnabled;
-  late bool _faceEnabled;
+  bool _fingerprintEnabled = true;
+  bool _faceEnabled = true;
   bool _isSaving = false;
+  bool _isInitialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    final user = context.auth.currentUser;
-    _fingerprintEnabled = user?.biometricFingerprintEnabled ?? true;
-    _faceEnabled = user?.biometricFaceEnabled ?? true;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      final user = context.auth.currentUser;
+      if (user != null) {
+        _fingerprintEnabled = user.biometricFingerprintEnabled;
+        _faceEnabled = user.biometricFaceEnabled;
+      }
+      _isInitialized = true;
+    }
   }
 
   Future<void> _handleTestBiometrics() async {
@@ -48,7 +54,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     );
   }
 
-  void _handleSavePreferences() {
+  Future<void> _handleSavePreferences() async {
     setState(() {
       _isSaving = true;
     });
@@ -60,12 +66,14 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         biometricFaceEnabled: _faceEnabled,
       );
 
-      context.auth.updateCurrentProfile(
+      await context.auth.updateCurrentProfile(
         updatedUser: updated,
         userState: context.users,
         notificationState: context.notifications,
       );
     }
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

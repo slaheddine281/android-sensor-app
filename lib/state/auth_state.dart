@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_user.dart';
 import '../models/user_notification.dart';
+import '../core/constants/supabase_constants.dart';
 import '../services/mock_biometric_service.dart';
 import 'user_state.dart';
 import 'notification_state.dart';
@@ -18,6 +20,8 @@ class AuthState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  SupabaseClient? get _supabase => SupabaseConstants.client;
+
   void setRememberMe(bool value) {
     _rememberMe = value;
     notifyListeners();
@@ -30,14 +34,50 @@ class AuthState extends ChangeNotifier {
     }
   }
 
-  /// Simulate checking session on splash screen
+  /// Fetch a profile row from public.profiles by user UUID
+  Future<AppUser?> _fetchProfile(String userId) async {
+    final sb = _supabase;
+    if (sb == null) return null;
+    try {
+      final data = await sb
+          .from(SupabaseConstants.profilesTable)
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+      if (data == null) return null;
+      return AppUser.fromMap(data);
+    } catch (e) {
+      debugPrint('_fetchProfile error: $e');
+      return null;
+    }
+  }
+
+  /// Check session on splash screen (uses Supabase persisted session when available)
   Future<bool> checkExistingSession(UserState userState) async {
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 1000));
+    final sb = _supabase;
+    if (sb != null) {
+      try {
+        final session = sb.auth.currentSession;
+        if (session != null) {
+          final profile = await _fetchProfile(session.user.id);
+          if (profile != null) {
+            _currentUser = profile;
+            if (userState.findById(profile.id) == null) {
+              userState.addUser(profile);
+            }
+            _isLoading = false;
+            notifyListeners();
+            return true;
+          }
+        }
+      } catch (e) {
+        debugPrint('checkExistingSession error: $e');
+      }
+    }
 
-    // For first launch demo, start unauthenticated or with Amine if remembered
     _isLoading = false;
     notifyListeners();
     return _currentUser != null;
@@ -54,12 +94,77 @@ class AuthState extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 700));
-
     final cleanEmail = emailOrUsername.trim().toLowerCase();
-    AppUser? targetUser = userState.findByEmail(cleanEmail);
+    final sb = _supabase;
 
-    // If not found by exact email, allow searching by name or demo shortcut
+    if (sb != null) {
+      try {
+        final response = await sb.auth.signInWithPassword(
+          email: cleanEmail,
+          password: password,
+        );
+
+        if (response.user == null) {
+          _errorMessage = 'Identifiants incorrects. Veuillez réessayer.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        final profile = await _fetchProfile(response.user!.id);
+        if (profile == null) {
+          _errorMessage = 'Profil introuvable. Contactez un administrateur.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        if (profile.isSuspended) {
+          await sb.auth.signOut();
+          _errorMessage =
+              'Ce compte a été suspendu par un administrateur. Connexion impossible.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        await sb
+            .from(SupabaseConstants.profilesTable)
+            .update({'last_login_at': DateTime.now().toIso8601String()})
+            .eq('id', profile.id);
+
+        final updated = profile.copyWith(lastLoginAt: DateTime.now());
+        _currentUser = updated;
+
+        if (userState.findById(updated.id) == null) {
+          userState.addUser(updated);
+        } else {
+          userState.updateUser(updated);
+        }
+
+        notificationState.addNotification(
+          title: 'Connexion réussie',
+          message: 'Connexion effectuée avec succès (${updated.fullName}).',
+          type: NotificationType.loginDetected,
+          relatedUserId: updated.id,
+        );
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } on AuthException catch (e) {
+        _errorMessage = _mapAuthError(e.message);
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      } catch (e) {
+        // Fall back to in-memory check if network error or test mode
+        debugPrint('Supabase loginUser fallback: $e');
+      }
+    }
+
+    // In-memory fallback (used in unit tests / offline)
+    AppUser? targetUser = userState.findByEmail(cleanEmail);
     if (targetUser == null) {
       final matches = userState.allUsers.where(
         (u) => u.fullName.toLowerCase().contains(cleanEmail),
@@ -84,7 +189,6 @@ class AuthState extends ChangeNotifier {
       return false;
     }
 
-    // Passwords in mock demo: at least 4 characters
     if (password.length < 4) {
       _errorMessage = "Mot de passe trop court (min. 4 caractères).";
       _isLoading = false;
@@ -92,7 +196,6 @@ class AuthState extends ChangeNotifier {
       return false;
     }
 
-    // Success
     final updated = targetUser.copyWith(lastLoginAt: DateTime.now());
     userState.updateUser(updated);
     _currentUser = updated;
@@ -120,9 +223,84 @@ class AuthState extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 800));
-
     final cleanEmail = email.trim().toLowerCase();
+    final sb = _supabase;
+
+    if (sb != null) {
+      try {
+        final response = await sb.auth.signInWithPassword(
+          email: cleanEmail,
+          password: password,
+        );
+
+        if (response.user == null) {
+          _errorMessage = "Identifiants d'administrateur introuvables.";
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        final profile = await _fetchProfile(response.user!.id);
+        if (profile == null) {
+          await sb.auth.signOut();
+          _errorMessage = "Profil administrateur introuvable.";
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        if (!profile.isAdmin) {
+          await sb.auth.signOut();
+          _errorMessage =
+              "Accès refusé : Ce compte n'a pas les privilèges administrateur.";
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        if (profile.isSuspended) {
+          await sb.auth.signOut();
+          _errorMessage = "Ce compte administrateur est suspendu.";
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        await sb
+            .from(SupabaseConstants.profilesTable)
+            .update({'last_login_at': DateTime.now().toIso8601String()})
+            .eq('id', profile.id);
+
+        final updated = profile.copyWith(lastLoginAt: DateTime.now());
+        _currentUser = updated;
+
+        if (userState.findById(updated.id) == null) {
+          userState.addUser(updated);
+        } else {
+          userState.updateUser(updated);
+        }
+
+        notificationState.addNotification(
+          title: 'Connexion Administrateur',
+          message: 'Session admin ouverte par ${updated.fullName}.',
+          type: NotificationType.loginDetected,
+          relatedUserId: updated.id,
+        );
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } on AuthException catch (e) {
+        _errorMessage = _mapAuthError(e.message);
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      } catch (e) {
+        debugPrint('Supabase loginAdmin fallback: $e');
+      }
+    }
+
+    // In-memory fallback
     final user = userState.findByEmail(cleanEmail);
 
     if (user == null) {
@@ -191,11 +369,20 @@ class AuthState extends ChangeNotifier {
       return false;
     }
 
-    // Find the user to log in (default to Amine or targetEmail)
     AppUser? user;
-    if (targetEmail != null) {
+    final sb = _supabase;
+    if (sb != null) {
+      final session = sb.auth.currentSession;
+      if (session != null) {
+        user = await _fetchProfile(session.user.id);
+      }
+    }
+
+    if (user == null && targetEmail != null) {
       user = userState.findByEmail(targetEmail);
-    } else {
+    }
+
+    if (user == null) {
       final candidates = userState.allUsers.where(
         (u) =>
             type == BiometricType.fingerprint
@@ -224,7 +411,9 @@ class AuthState extends ChangeNotifier {
     }
 
     final updated = user.copyWith(lastLoginAt: DateTime.now());
-    userState.updateUser(updated);
+    if (userState.findById(updated.id) != null) {
+      userState.updateUser(updated);
+    }
     _currentUser = updated;
     _isLoading = false;
 
@@ -240,7 +429,7 @@ class AuthState extends ChangeNotifier {
     return true;
   }
 
-  /// Register a new user in local state
+  /// Register a new user via Supabase Auth + profiles table
   Future<bool> registerUser({
     required String fullName,
     required String email,
@@ -252,9 +441,86 @@ class AuthState extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 700));
-
     final cleanEmail = email.trim().toLowerCase();
+    final sb = _supabase;
+
+    if (sb != null) {
+      try {
+        final response = await sb.auth.signUp(
+          email: cleanEmail,
+          password: password,
+          data: {
+            'full_name': fullName.trim(),
+            'role': 'user',
+          },
+        );
+
+        if (response.user == null) {
+          _errorMessage = "Échec de la création du compte. Réessayez.";
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        await Future.delayed(const Duration(milliseconds: 800));
+        AppUser? profile = await _fetchProfile(response.user!.id);
+
+        if (profile == null) {
+          await sb.from(SupabaseConstants.profilesTable).upsert({
+            'id': response.user!.id,
+            'full_name': fullName.trim(),
+            'email': cleanEmail,
+            'role': 'user',
+            'status': 'active',
+            'level': 1,
+            'biometric_fingerprint_enabled': false,
+            'biometric_face_enabled': false,
+            'created_at': DateTime.now().toIso8601String(),
+            'last_login_at': DateTime.now().toIso8601String(),
+          });
+          profile = await _fetchProfile(response.user!.id);
+        }
+
+        profile ??= AppUser(
+          id: response.user!.id,
+          fullName: fullName.trim(),
+          email: cleanEmail,
+          role: UserRole.user,
+          status: UserStatus.active,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+          biometricFingerprintEnabled: false,
+          biometricFaceEnabled: false,
+          level: 1,
+        );
+
+        _currentUser = profile;
+
+        if (userState.findById(profile.id) == null) {
+          userState.addUser(profile);
+        }
+
+        notificationState.addNotification(
+          title: 'Compte créé',
+          message: "Un nouvel utilisateur s'est inscrit : ${profile.fullName}.",
+          type: NotificationType.accountCreated,
+          relatedUserId: profile.id,
+        );
+
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } on AuthException catch (e) {
+        _errorMessage = _mapAuthError(e.message);
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      } catch (e) {
+        debugPrint('Supabase registerUser fallback: $e');
+      }
+    }
+
+    // In-memory fallback (used in unit tests / offline)
     if (userState.findByEmail(cleanEmail) != null) {
       _errorMessage = "Un compte existe déjà avec cette adresse email.";
       _isLoading = false;
@@ -295,11 +561,34 @@ class AuthState extends ChangeNotifier {
   }
 
   /// Update the current authenticated user's profile
-  void updateCurrentProfile({
+  Future<void> updateCurrentProfile({
     required AppUser updatedUser,
     required UserState userState,
     required NotificationState notificationState,
-  }) {
+  }) async {
+    final sb = _supabase;
+    if (sb != null) {
+      try {
+        await sb
+            .from(SupabaseConstants.profilesTable)
+            .update({
+              'full_name': updatedUser.fullName,
+              'avatar_url': updatedUser.avatarUrl,
+              'height_cm': updatedUser.heightCm,
+              'weight_kg': updatedUser.weightKg,
+              'birth_date': updatedUser.birthDate?.toIso8601String(),
+              'level': updatedUser.level,
+              'device_info': updatedUser.deviceInfo,
+              'biometric_fingerprint_enabled':
+                  updatedUser.biometricFingerprintEnabled,
+              'biometric_face_enabled': updatedUser.biometricFaceEnabled,
+            })
+            .eq('id', updatedUser.id);
+      } catch (e) {
+        debugPrint('updateCurrentProfile Supabase error: $e');
+      }
+    }
+
     userState.updateUser(updatedUser);
     _currentUser = updatedUser;
 
@@ -313,13 +602,27 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Delete current user account (User space)
-  void deleteCurrentAccount({
+  /// Delete current user account
+  Future<void> deleteCurrentAccount({
     required UserState userState,
     required NotificationState notificationState,
-  }) {
+  }) async {
     if (_currentUser == null) return;
     final deleted = _currentUser!;
+
+    final sb = _supabase;
+    if (sb != null) {
+      try {
+        await sb
+            .from(SupabaseConstants.profilesTable)
+            .update({'status': 'suspended'})
+            .eq('id', deleted.id);
+        await sb.auth.signOut();
+      } catch (e) {
+        debugPrint('deleteCurrentAccount error: $e');
+      }
+    }
+
     userState.deleteUser(deleted.id);
 
     notificationState.addNotification(
@@ -332,22 +635,65 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Request password reset
+  /// Request password reset via Supabase
   Future<bool> requestPasswordReset(String email) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    final sb = _supabase;
+    if (sb != null) {
+      try {
+        await sb.auth.resetPasswordForEmail(email.trim().toLowerCase());
+      } catch (e) {
+        debugPrint('requestPasswordReset error: $e');
+      }
+    }
+
     _isLoading = false;
     notifyListeners();
     return true;
   }
 
   /// Sign Out
-  void signOut() {
+  Future<void> signOut() async {
+    final sb = _supabase;
+    if (sb != null) {
+      try {
+        await sb.auth.signOut();
+      } catch (e) {
+        debugPrint('signOut error: $e');
+      }
+    }
     _currentUser = null;
     _errorMessage = null;
     notifyListeners();
+  }
+
+  /// Map Supabase Auth error messages to French
+  String _mapAuthError(String message) {
+    final msg = message.toLowerCase();
+    if (msg.contains('invalid login credentials') ||
+        msg.contains('invalid credentials') ||
+        msg.contains('email not confirmed')) {
+      return 'Email ou mot de passe incorrect.';
+    }
+    if (msg.contains('user already registered') ||
+        msg.contains('already been registered')) {
+      return 'Un compte existe déjà avec cette adresse email.';
+    }
+    if (msg.contains('password should be at least')) {
+      return 'Le mot de passe doit contenir au moins 6 caractères.';
+    }
+    if (msg.contains('unable to validate email address')) {
+      return 'Adresse email invalide.';
+    }
+    if (msg.contains('network') || msg.contains('connection')) {
+      return 'Erreur réseau. Vérifiez votre connexion internet.';
+    }
+    if (msg.contains('email rate limit')) {
+      return 'Trop de tentatives. Réessayez dans quelques minutes.';
+    }
+    return 'Erreur d\'authentification. Réessayez.';
   }
 }

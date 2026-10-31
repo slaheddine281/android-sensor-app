@@ -21,19 +21,30 @@ class _EditUserAdminScreenState extends State<EditUserAdminScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _emailController;
-  late UserRole _selectedRole;
-  late UserStatus _selectedStatus;
+  UserRole _selectedRole = UserRole.user;
+  UserStatus _selectedStatus = UserStatus.active;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    final user = context.users.findById(widget.userId);
-    _nameController = TextEditingController(text: user?.fullName ?? '');
-    _emailController = TextEditingController(text: user?.email ?? '');
-    _selectedRole = user?.role ?? UserRole.user;
-    _selectedStatus = user?.status ?? UserStatus.active;
+    _nameController = TextEditingController();
+    _emailController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      final user = context.users.findById(widget.userId);
+      _nameController.text = user?.fullName ?? '';
+      _emailController.text = user?.email ?? '';
+      _selectedRole = user?.role ?? UserRole.user;
+      _selectedStatus = user?.status ?? UserStatus.active;
+      _isInitialized = true;
+    }
   }
 
   @override

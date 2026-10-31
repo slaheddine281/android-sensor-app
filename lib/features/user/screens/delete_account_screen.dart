@@ -25,7 +25,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     super.dispose();
   }
 
-  void _handleDelete() {
+  Future<void> _handleDelete() async {
     final user = context.auth.currentUser;
     if (user == null) return;
 
@@ -55,11 +55,13 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       _isDeleting = true;
     });
 
-    // Delete in local state only
-    context.auth.deleteCurrentAccount(
+    // Delete in Supabase + local state
+    await context.auth.deleteCurrentAccount(
       userState: context.users,
       notificationState: context.notifications,
     );
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

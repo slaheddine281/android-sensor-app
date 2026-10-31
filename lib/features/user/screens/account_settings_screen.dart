@@ -176,8 +176,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     );
   }
 
-  void _handleSignOut() {
-    context.auth.signOut();
+  Future<void> _handleSignOut() async {
+    await context.auth.signOut();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Déconnexion réussie.'),
