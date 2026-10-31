@@ -19,9 +19,8 @@ class FaceRecognitionService {
     return _modelsLoaded;
   }
 
-  /// Activer le flux de la caméra
+  /// Activer le flux de la caméra immédiatement
   Future<bool> startCamera({String elementId = 'stepquest-camera-preview'}) async {
-    await initializeModels();
     return await _impl.startCamera(elementId: elementId);
   }
 
@@ -45,3 +44,4 @@ class FaceRecognitionService {
     return _impl.compareFaces(storedEmbedding, liveEmbedding);
   }
 }
+

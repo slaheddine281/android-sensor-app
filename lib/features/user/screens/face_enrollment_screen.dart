@@ -37,15 +37,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   Future<void> _initCamera() async {
     setState(() {
-      _isProcessing = true;
-      _statusMessage = 'Chargement des modèles (ssd_mobilenetv1, landmark, recognition)...';
+      _isProcessing = false;
+      _statusMessage = 'Démarrage de la caméra...';
     });
 
     final faceService = context.faceRecognition;
-    await faceService.initializeModels();
-
-    if (!mounted) return;
-
     final camOk = await faceService.startCamera();
 
     if (!mounted) return;
@@ -56,6 +52,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
           ? 'Placez votre visage au centre du cadre puis appuyez sur "Capturer".'
           : 'Caméra prête. Vous pouvez capturer votre visage.';
     });
+
+    // Chargement des modèles IA en arrière-plan sans bloquer l'interface
+    faceService.initializeModels();
   }
 
   @override
