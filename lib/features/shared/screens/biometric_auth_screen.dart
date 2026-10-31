@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../services/mock_biometric_service.dart';
 import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_button.dart';
+
+// Import conditionnel Web uniquement pour HtmlElementView
+import '../../user/screens/face_enrollment_screen_web.dart'
+    if (dart.library.io) '../../user/screens/face_enrollment_screen_stub.dart';
 
 class BiometricAuthScreen extends StatefulWidget {
   final BiometricType type;
@@ -27,11 +32,17 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
 
   bool _isVerifying = false;
   bool? _isSuccess;
-  String _statusMessage = 'Placez votre doigt sur le capteur pour continuer.';
+  bool _cameraOpen = false;
+  String _statusMessage = '';
 
   @override
   void initState() {
     super.initState();
+
+    _statusMessage = widget.type == BiometricType.face
+        ? 'Appuyez sur "Scanner" pour démarrer la reconnaissance faciale.'
+        : 'Placez votre doigt sur le capteur pour continuer.';
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -40,16 +51,16 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
-
-    if (widget.type == BiometricType.face) {
-      _statusMessage = 'Positionnez votre visage devant la caméra.';
-    }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
-    context.faceRecognition.stopCamera();
+    // Arrêter la caméra proprement à la fermeture
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // ignore: use_build_context_synchronously
+      context.faceRecognition.stopCamera();
+    });
     super.dispose();
   }
 
@@ -57,15 +68,39 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     setState(() {
       _isVerifying = true;
       _isSuccess = null;
-      _statusMessage = 'Ouverture de la caméra & analyse des modèles d\'IA...';
+      _cameraOpen = false;
+      _statusMessage = 'Ouverture de la caméra...';
     });
 
     final faceService = context.faceRecognition;
-    await faceService.startCamera();
+    final camOk = await faceService.startCamera();
+
+    if (!mounted) return;
+
+    setState(() {
+      _cameraOpen = camOk;
+      _statusMessage = camOk
+          ? 'Caméra active. Regardez l\'objectif puis appuyez sur "Capturer".'
+          : 'Impossible d\'accéder à la caméra.';
+      if (!camOk) _isVerifying = false;
+    });
+  }
+
+  Future<void> _captureAndVerifyFace() async {
+    if (!mounted) return;
+    setState(() {
+      _statusMessage = 'Analyse du visage en cours...';
+    });
+
+    final faceService = context.faceRecognition;
     final result = await faceService.scanFace();
+
+    if (!mounted) return;
+
     await faceService.stopCamera();
 
     if (!mounted) return;
+    setState(() => _cameraOpen = false);
 
     if (!result.success || result.faceEmbeddingJson == null) {
       setState(() {
@@ -113,10 +148,8 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
         );
       }
 
-      await Future.delayed(const Duration(milliseconds: 700));
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (mounted) Navigator.of(context).pop(true);
     } else {
       setState(() {
         _isVerifying = false;
@@ -127,17 +160,16 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     }
   }
 
-  Future<void> _triggerScan({required bool succeed}) async {
+  Future<void> _triggerSimulatedScan({required bool succeed}) async {
     setState(() {
       _isVerifying = true;
       _isSuccess = null;
       _statusMessage = widget.type == BiometricType.fingerprint
-          ? 'Lecture de l\'empreinte en cours...'
-          : 'Analyse biométrique faciale en cours...';
+          ? 'Lecture de l\'empreinte...'
+          : 'Analyse biométrique faciale...';
     });
 
     await Future.delayed(const Duration(milliseconds: 1200));
-
     if (!mounted) return;
 
     if (succeed) {
@@ -148,7 +180,6 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       });
 
       if (!widget.isSimulationTestOnly) {
-        // Authenticate the user in AuthState
         await context.auth.loginWithBiometrics(
           type: widget.type,
           userState: context.users,
@@ -159,15 +190,12 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       }
 
       await Future.delayed(const Duration(milliseconds: 700));
-      if (mounted) {
-        Navigator.of(context).pop(true);
-      }
+      if (mounted) Navigator.of(context).pop(true);
     } else {
       setState(() {
         _isVerifying = false;
         _isSuccess = false;
-        _statusMessage =
-            'Empreinte non reconnue. Veuillez réessayer.';
+        _statusMessage = 'Biométrie non reconnue. Veuillez réessayer.';
       });
     }
   }
@@ -175,11 +203,8 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
   @override
   Widget build(BuildContext context) {
     Color glowColor = AppColors.primary;
-    if (_isSuccess == true) {
-      glowColor = AppColors.secondary;
-    } else if (_isSuccess == false) {
-      glowColor = AppColors.error;
-    }
+    if (_isSuccess == true) glowColor = AppColors.secondary;
+    if (_isSuccess == false) glowColor = AppColors.error;
 
     return Scaffold(
       backgroundColor: AppColors.navyDark,
@@ -192,59 +217,15 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
             children: [
               const Spacer(),
 
-              // Animated Biometric Scanner matching mockup Screen 17
-              Center(
-                child: AnimatedBuilder(
-                  animation: _pulseAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _isVerifying ? _pulseAnimation.value : 1.0,
-                      child: Container(
-                        width: 140,
-                        height: 140,
-                        decoration: BoxDecoration(
-                          color: glowColor.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: glowColor.withValues(alpha: 0.4),
-                            width: 2.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: glowColor.withValues(alpha: 0.35),
-                              blurRadius: 36,
-                              spreadRadius: 6,
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: _isSuccess == true
-                              ? const Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 68,
-                                  color: AppColors.secondary,
-                                )
-                              : _isSuccess == false
-                                  ? const Icon(
-                                      Icons.error_outline_rounded,
-                                      size: 68,
-                                      color: AppColors.error,
-                                    )
-                                  : Icon(
-                                      widget.type == BiometricType.fingerprint
-                                          ? Icons.fingerprint_rounded
-                                          : Icons.face_rounded,
-                                      size: 72,
-                                      color: AppColors.primaryLight,
-                                    ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 36),
+              // ── Icône / Caméra principale ──────────────────────────────
+              if (widget.type == BiometricType.face && _cameraOpen)
+                _buildFaceCameraWidget()
+              else
+                _buildBiometricIcon(glowColor),
 
+              const SizedBox(height: 32),
+
+              // ── Titre ──────────────────────────────────────────────────
               const Text(
                 'Authentification requise',
                 textAlign: TextAlign.center,
@@ -257,6 +238,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
               ),
               const SizedBox(height: 10),
 
+              // ── Message de statut ──────────────────────────────────────
               Text(
                 _statusMessage,
                 textAlign: TextAlign.center,
@@ -270,34 +252,61 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                   height: 1.4,
                 ),
               ),
+
               const Spacer(),
 
-              // Real AI Camera Scan for Face
+              // ── Boutons de scan facial réel ────────────────────────────
               if (widget.type == BiometricType.face) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                if (!_cameraOpen)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
                       ),
-                      elevation: 4,
+                      icon: const Icon(Icons.camera_alt_rounded),
+                      label: const Text(
+                        'Scanner mon visage',
+                        style:
+                            TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                      onPressed:
+                          _isVerifying ? null : _triggerRealCameraFaceScan,
                     ),
-                    icon: const Icon(Icons.camera_alt_rounded),
-                    label: const Text(
-                      'Scanner avec ma caméra (Modèles IA)',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                      ),
+                      icon: const Icon(Icons.face_retouching_natural_rounded),
+                      label: const Text(
+                        'Capturer mon visage',
+                        style:
+                            TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                      onPressed:
+                          _isVerifying ? null : _captureAndVerifyFace,
                     ),
-                    onPressed: _isVerifying ? null : _triggerRealCameraFaceScan,
                   ),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
               ],
 
-              // Simulation Controls
+              // ── Contrôles de simulation (mode test) ────────────────────
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -308,11 +317,11 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                 child: Column(
                   children: [
                     const Text(
-                      'CONTRÔLES DE SIMULATION BIOMÉTRIQUE',
+                      'SIMULATION BIOMÉTRIQUE',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF94A3B8),
+                        color: Color(0xFF64748B),
                         letterSpacing: 0.8,
                       ),
                     ),
@@ -324,17 +333,19 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            icon: const Icon(Icons.touch_app, size: 16),
-                            label: const Text('Tester succès',
+                            icon: const Icon(Icons.check_circle_outline,
+                                size: 16),
+                            label: const Text('Succès',
                                 style: TextStyle(fontSize: 13)),
                             onPressed: _isVerifying
                                 ? null
-                                : () => _triggerScan(succeed: true),
+                                : () => _triggerSimulatedScan(succeed: true),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -342,18 +353,21 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFFFCA5A5),
-                              side: const BorderSide(color: Color(0xFF64748B)),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              side: const BorderSide(
+                                  color: Color(0xFF64748B)),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            icon: const Icon(Icons.block, size: 16),
-                            label: const Text('Tester échec',
+                            icon:
+                                const Icon(Icons.cancel_outlined, size: 16),
+                            label: const Text('Échec',
                                 style: TextStyle(fontSize: 13)),
                             onPressed: _isVerifying
                                 ? null
-                                : () => _triggerScan(succeed: false),
+                                : () => _triggerSimulatedScan(succeed: false),
                           ),
                         ),
                       ],
@@ -361,9 +375,9 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Cancel button
+              // ── Bouton annuler ─────────────────────────────────────────
               AppButton.secondary(
                 label: 'Annuler',
                 onPressed: () => Navigator.of(context).pop(false),
@@ -375,5 +389,125 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       ),
     );
   }
-}
 
+  /// Icône biométrique animée (pour empreinte ou quand caméra fermée)
+  Widget _buildBiometricIcon(Color glowColor) {
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _isVerifying ? _pulseAnimation.value : 1.0,
+          child: Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              color: glowColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: glowColor.withValues(alpha: 0.4),
+                width: 2.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: 0.35),
+                  blurRadius: 36,
+                  spreadRadius: 6,
+                ),
+              ],
+            ),
+            child: Center(
+              child: _isSuccess == true
+                  ? const Icon(Icons.check_circle_rounded,
+                      size: 68, color: AppColors.secondary)
+                  : _isSuccess == false
+                      ? const Icon(Icons.error_outline_rounded,
+                          size: 68, color: AppColors.error)
+                      : Icon(
+                          widget.type == BiometricType.fingerprint
+                              ? Icons.fingerprint_rounded
+                              : Icons.face_rounded,
+                          size: 72,
+                          color: AppColors.primaryLight,
+                        ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Fenêtre caméra intégrée pour la reconnaissance faciale
+  Widget _buildFaceCameraWidget() {
+    return Container(
+      width: 220,
+      height: 270,
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.secondary, width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.secondary.withValues(alpha: 0.35),
+            blurRadius: 28,
+            spreadRadius: 4,
+          ),
+        ],
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Flux caméra
+          if (kIsWeb) buildCameraView(),
+
+          // Ovale guide
+          Center(
+            child: Container(
+              width: 155,
+              height: 205,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(
+                  color: AppColors.secondary.withValues(alpha: 0.85),
+                  width: 2,
+                ),
+              ),
+            ),
+          ),
+
+          // Coins de visée
+          ..._miniCorners(),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _miniCorners() {
+    const c = AppColors.secondary;
+    const t = 2.5;
+    const s = 16.0;
+    const o = 10.0;
+    return [
+      Positioned(top: o, left: o, child: _corner(s, t, c, top: true, left: true)),
+      Positioned(top: o, right: o, child: _corner(s, t, c, top: true, right: true)),
+      Positioned(bottom: o, left: o, child: _corner(s, t, c, bottom: true, left: true)),
+      Positioned(bottom: o, right: o, child: _corner(s, t, c, bottom: true, right: true)),
+    ];
+  }
+
+  Widget _corner(double size, double thick, Color color,
+      {bool top = false, bool bottom = false, bool left = false, bool right = false}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        border: Border(
+          top: top ? BorderSide(color: color, width: thick) : BorderSide.none,
+          bottom: bottom ? BorderSide(color: color, width: thick) : BorderSide.none,
+          left: left ? BorderSide(color: color, width: thick) : BorderSide.none,
+          right: right ? BorderSide(color: color, width: thick) : BorderSide.none,
+        ),
+      ),
+    );
+  }
+}

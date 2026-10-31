@@ -1,9 +1,14 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_app_bar.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/app_card.dart';
+
+// Imports conditionnels Web uniquement
+import 'face_enrollment_screen_web.dart'
+    if (dart.library.io) 'face_enrollment_screen_stub.dart';
 
 class FaceEnrollmentScreen extends StatefulWidget {
   const FaceEnrollmentScreen({super.key});
@@ -18,26 +23,35 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   late Animation<double> _scanAnimation;
 
   bool _isProcessing = false;
-  String _statusMessage = 'Initialisation des modèles d\'IA faciale...';
+  bool _cameraActive = false;
+  bool _modelLoading = true;
+  String _statusMessage = 'Démarrage de la caméra...';
 
   @override
   void initState() {
     super.initState();
+
     _scanController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    _scanAnimation = Tween<double>(begin: 0.1, end: 0.9).animate(
+    _scanAnimation = Tween<double>(begin: 0.05, end: 0.88).animate(
       CurvedAnimation(parent: _scanController, curve: Curves.easeInOut),
     );
 
-    _initCamera();
+    // Initialiser la caméra après le premier frame (évite l'erreur initState)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initCamera();
+    });
   }
 
   Future<void> _initCamera() async {
+    if (!mounted) return;
+
     setState(() {
       _isProcessing = false;
+      _cameraActive = false;
       _statusMessage = 'Démarrage de la caméra...';
     });
 
@@ -47,14 +61,18 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     if (!mounted) return;
 
     setState(() {
-      _isProcessing = false;
+      _cameraActive = camOk;
       _statusMessage = camOk
-          ? 'Placez votre visage au centre du cadre puis appuyez sur "Capturer".'
-          : 'Caméra prête. Vous pouvez capturer votre visage.';
+          ? 'Placez votre visage dans l\'ovale puis appuyez sur "Capturer".'
+          : 'Impossible d\'accéder à la caméra. Vérifiez les permissions.';
     });
 
-    // Chargement des modèles IA en arrière-plan sans bloquer l'interface
-    faceService.initializeModels();
+    // Charger les modèles IA en arrière-plan sans bloquer l'interface
+    faceService.initializeModels().then((_) {
+      if (mounted) {
+        setState(() => _modelLoading = false);
+      }
+    });
   }
 
   @override
@@ -67,7 +85,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   Future<void> _handleCaptureFace() async {
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Détection et analyse des 68 points caractéristiques...';
+      _statusMessage = 'Analyse des caractéristiques faciales en cours...';
     });
 
     final faceService = context.faceRecognition;
@@ -95,7 +113,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
       setState(() {
         _isProcessing = false;
-        _statusMessage = 'Visage enregistré et lié à votre profil avec succès !';
+        _statusMessage = '✓ Visage enregistré avec succès !';
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +183,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     if (!mounted) return;
 
     setState(() {
-      _statusMessage = 'Données biométriques faciales supprimées.';
+      _statusMessage = 'Données biométriques supprimées.';
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -181,19 +199,18 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = context.auth.currentUser;
     final hasFace = user?.hasFaceRegistered ?? false;
+    final accentColor = hasFace ? AppColors.secondary : AppColors.primary;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
-      appBar: const AppAppBar(
-        title: 'Reconnaissance Faciale',
-      ),
+      appBar: const AppAppBar(title: 'Reconnaissance Faciale'),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header Card
+              // ── Carte d'état ──────────────────────────────────────────────
               AppCard(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -208,8 +225,10 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
-                        Icons.face_rounded,
-                        color: hasFace ? AppColors.secondary : AppColors.primary,
+                        hasFace
+                            ? Icons.face_retouching_natural_rounded
+                            : Icons.face_rounded,
+                        color: accentColor,
                         size: 30,
                       ),
                     ),
@@ -219,18 +238,22 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            hasFace ? 'Visage configuré' : 'Aucun visage enregistré',
+                            hasFace
+                                ? 'Visage configuré'
+                                : 'Aucun visage enregistré',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : AppColors.textPrimary,
+                              color: isDark
+                                  ? Colors.white
+                                  : AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             hasFace
-                                ? 'Votre profil utilise la reconnaissance faciale pour la connexion.'
-                                : 'Scannez votre visage avec la caméra pour activer Face ID.',
+                                ? 'Face ID actif — connexion par reconnaissance faciale.'
+                                : 'Scannez votre visage pour activer le Face ID.',
                             style: TextStyle(
                               fontSize: 12,
                               color: isDark
@@ -241,73 +264,116 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                         ],
                       ),
                     ),
+                    if (hasFace)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color:
+                              AppColors.secondary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'ACTIF',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.secondary,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Camera Scanner Viewport
+              // ── Fenêtre caméra + guide facial ────────────────────────────
               Center(
                 child: Container(
                   width: 260,
                   height: 320,
+                  clipBehavior: Clip.hardEdge,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B),
+                    color: const Color(0xFF0F172A),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: hasFace ? AppColors.secondary : AppColors.primary,
+                      color: _cameraActive
+                          ? accentColor
+                          : const Color(0xFF334155),
                       width: 2.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: (hasFace ? AppColors.secondary : AppColors.primary)
-                            .withValues(alpha: 0.25),
-                        blurRadius: 24,
+                        color: (_cameraActive ? accentColor : Colors.black)
+                            .withValues(alpha: 0.3),
+                        blurRadius: 28,
                         spreadRadius: 2,
                       ),
                     ],
                   ),
                   child: Stack(
-                    alignment: Alignment.center,
+                    fit: StackFit.expand,
                     children: [
-                      // Oval Face Guide
-                      Container(
-                        width: 190,
-                        height: 250,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.rectangle,
-                          borderRadius: BorderRadius.circular(100),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.4),
-                            width: 2,
-                            strokeAlign: BorderSide.strokeAlignCenter,
+                      // ── Flux caméra via HtmlElementView (Web uniquement) ──
+                      if (kIsWeb && _cameraActive)
+                        buildCameraView()
+                      else
+                        // Placeholder sombre si caméra inactive
+                        Container(
+                          color: const Color(0xFF0F172A),
+                          child: Center(
+                            child: Icon(
+                              _cameraActive
+                                  ? Icons.videocam_rounded
+                                  : Icons.videocam_off_rounded,
+                              size: 48,
+                              color: Colors.white.withValues(alpha: 0.2),
+                            ),
                           ),
                         ),
-                        child: Center(
-                          child: Icon(
-                            Icons.face_retouching_natural_rounded,
-                            size: 80,
-                            color: Colors.white.withValues(alpha: 0.2),
+
+                      // ── Ovale guide facial ────────────────────────────────
+                      Center(
+                        child: Container(
+                          width: 185,
+                          height: 248,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(120),
+                            border: Border.all(
+                              color: _cameraActive
+                                  ? accentColor.withValues(alpha: 0.85)
+                                  : Colors.white.withValues(alpha: 0.25),
+                              width: 2.5,
+                            ),
                           ),
                         ),
                       ),
 
-                      // Animated Laser Beam
+                      // ── Laser de scan animé (pendant traitement) ──────────
                       if (_isProcessing)
                         AnimatedBuilder(
                           animation: _scanAnimation,
                           builder: (context, _) {
                             return Positioned(
-                              top: 320 * _scanAnimation.value,
+                              top: 310 * _scanAnimation.value,
                               left: 20,
                               right: 20,
                               child: Container(
-                                height: 3,
+                                height: 2.5,
                                 decoration: BoxDecoration(
-                                  color: AppColors.secondary,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.transparent,
+                                      AppColors.secondary,
+                                      AppColors.secondary,
+                                      Colors.transparent,
+                                    ],
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.secondary.withValues(alpha: 0.8),
+                                      color: AppColors.secondary
+                                          .withValues(alpha: 0.8),
                                       blurRadius: 10,
                                       spreadRadius: 2,
                                     ),
@@ -318,72 +384,47 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                           },
                         ),
 
-                      // Corner crosshairs
-                      Positioned(
-                        top: 14,
-                        left: 14,
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              top: BorderSide(color: AppColors.primaryLight, width: 3),
-                              left: BorderSide(color: AppColors.primaryLight, width: 3),
-                            ),
-                          ),
+                      // ── Coins de visée ────────────────────────────────────
+                      ..._buildCornerCrosshairs(accentColor),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── Barre de chargement des modèles IA ───────────────────────
+              if (_modelLoading)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: accentColor.withValues(alpha: 0.6),
                         ),
                       ),
-                      Positioned(
-                        top: 14,
-                        right: 14,
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              top: BorderSide(color: AppColors.primaryLight, width: 3),
-                              right: BorderSide(color: AppColors.primaryLight, width: 3),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 14,
-                        left: 14,
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: AppColors.primaryLight, width: 3),
-                              left: BorderSide(color: AppColors.primaryLight, width: 3),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 14,
-                        right: 14,
-                        child: Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: AppColors.primaryLight, width: 3),
-                              right: BorderSide(color: AppColors.primaryLight, width: 3),
-                            ),
-                          ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Chargement des modèles IA...',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? const Color(0xFF64748B)
+                              : AppColors.textSecondary,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
 
-              // Status message
+              // ── Message de statut ─────────────────────────────────────────
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: isDark
                       ? const Color(0xFF1E293B)
@@ -400,8 +441,17 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                     Icon(
                       _isProcessing
                           ? Icons.sync_rounded
-                          : (hasFace ? Icons.check_circle : Icons.info_outline),
-                      color: hasFace ? AppColors.secondary : AppColors.primary,
+                          : (_statusMessage.startsWith('✓') ||
+                                  hasFace && _cameraActive)
+                              ? Icons.check_circle_rounded
+                              : _cameraActive
+                                  ? Icons.videocam_rounded
+                                  : Icons.info_outline_rounded,
+                      color: _isProcessing
+                          ? AppColors.primary
+                          : (_statusMessage.startsWith('✓') || hasFace)
+                              ? AppColors.secondary
+                              : accentColor,
                       size: 20,
                     ),
                     const SizedBox(width: 10),
@@ -411,45 +461,105 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.white70 : AppColors.textPrimary,
+                          color: isDark
+                              ? Colors.white70
+                              : AppColors.textPrimary,
                         ),
                       ),
                     ),
+                    if (_isProcessing)
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      ),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Capture Button
+              // ── Bouton principal ──────────────────────────────────────────
               AppButton(
                 label: hasFace
                     ? 'Mettre à jour mon visage'
-                    : 'Scanner & Enregistrer mon visage',
+                    : 'Capturer mon visage',
                 icon: Icons.camera_alt_outlined,
                 isLoading: _isProcessing,
-                onPressed: _handleCaptureFace,
+                onPressed: _isProcessing ? null : _handleCaptureFace,
               ),
               const SizedBox(height: 12),
 
-              // Delete button if face exists
+              // ── Bouton supprimer (si visage enregistré) ───────────────────
               if (hasFace) ...[
                 AppButton.destructive(
                   label: 'Supprimer mon visage',
                   icon: Icons.delete_outline_rounded,
-                  onPressed: _handleRemoveFace,
+                  onPressed: _isProcessing ? null : _handleRemoveFace,
                 ),
                 const SizedBox(height: 12),
               ],
 
-              // Back button
+              // ── Bouton retour ─────────────────────────────────────────────
               AppButton.secondary(
                 label: 'Retour',
                 onPressed: () => Navigator.of(context).pop(),
               ),
+              const SizedBox(height: 8),
             ],
           ),
         ),
       ),
     );
+  }
+
+  /// Construit les 4 coins de visée du scanner
+  List<Widget> _buildCornerCrosshairs(Color color) {
+    const size = 20.0;
+    const thickness = 3.0;
+    const offset = 12.0;
+
+    Widget corner({
+      bool top = false,
+      bool bottom = false,
+      bool left = false,
+      bool right = false,
+    }) {
+      return Positioned(
+        top: top ? offset : null,
+        bottom: bottom ? offset : null,
+        left: left ? offset : null,
+        right: right ? offset : null,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            border: Border(
+              top: top
+                  ? BorderSide(color: color, width: thickness)
+                  : BorderSide.none,
+              bottom: bottom
+                  ? BorderSide(color: color, width: thickness)
+                  : BorderSide.none,
+              left: left
+                  ? BorderSide(color: color, width: thickness)
+                  : BorderSide.none,
+              right: right
+                  ? BorderSide(color: color, width: thickness)
+                  : BorderSide.none,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return [
+      corner(top: true, left: true),
+      corner(top: true, right: true),
+      corner(bottom: true, left: true),
+      corner(bottom: true, right: true),
+    ];
   }
 }
