@@ -81,7 +81,9 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       _cameraOpen = camOk;
       _statusMessage = camOk
           ? 'Caméra active. Regardez l\'objectif puis appuyez sur "Capturer".'
-          : 'Impossible d\'accéder à la caméra.';
+          : kIsWeb
+            ? 'Impossible d\'accéder à la caméra.'
+            : 'La reconnaissance faciale est disponible dans la version Web uniquement.';
       if (!camOk) _isVerifying = false;
     });
   }
@@ -118,17 +120,21 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                 ? context.users.allUsers.first
                 : null));
 
-    bool match = true;
-    int confidence = 98;
-
-    if (targetUser != null && targetUser.hasFaceRegistered) {
-      final comp = faceService.compareFaces(
-        storedEmbedding: targetUser.faceEmbedding!,
-        liveEmbedding: result.faceEmbeddingJson!,
-      );
-      match = comp.isMatch;
-      confidence = comp.confidencePercentage;
+    if (targetUser == null || !targetUser.hasFaceRegistered) {
+      setState(() {
+        _isVerifying = false;
+        _isSuccess = false;
+        _statusMessage = 'Aucun visage n’est enregistré pour ce compte.';
+      });
+      return;
     }
+
+    final comp = faceService.compareFaces(
+      storedEmbedding: targetUser.faceEmbedding!,
+      liveEmbedding: result.faceEmbeddingJson!,
+    );
+    final match = comp.isMatch;
+    final confidence = comp.confidencePercentage;
 
     if (match) {
       setState(() {
@@ -218,7 +224,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
               const Spacer(),
 
               // ── Icône / Caméra principale ──────────────────────────────
-              if (widget.type == BiometricType.face && _cameraOpen)
+              if (widget.type == BiometricType.face)
                 _buildFaceCameraWidget()
               else
                 _buildBiometricIcon(glowColor),

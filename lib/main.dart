@@ -10,7 +10,7 @@ void main() async {
   // Initialize Supabase
   await Supabase.initialize(
     url: SupabaseConstants.supabaseUrl,
-    anonKey: SupabaseConstants.supabaseAnonKey,
+    publishableKey: SupabaseConstants.supabaseAnonKey,
   );
 
   // Set system overlay style for clean status bar

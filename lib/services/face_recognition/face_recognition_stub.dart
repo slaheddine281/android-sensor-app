@@ -2,38 +2,23 @@ import 'dart:convert';
 import 'dart:math';
 import 'face_recognition_types.dart';
 
-/// Implementation for non-web environments (Desktop / Tests)
+/// Face recognition is currently available only in the web implementation.
 class FaceRecognitionPlatformImpl {
-  bool isCameraActive = false;
-
   Future<bool> loadModels() async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    return true;
+    return false;
   }
 
   Future<bool> startCamera({String elementId = 'stepquest-camera-preview'}) async {
-    isCameraActive = true;
-    await Future.delayed(const Duration(milliseconds: 100));
-    return true;
+    return false;
   }
 
-  Future<void> stopCamera({String elementId = 'stepquest-camera-preview'}) async {
-    isCameraActive = false;
-  }
+  Future<void> stopCamera({String elementId = 'stepquest-camera-preview'}) async {}
 
   Future<FaceDetectionResult> detectAndExtractFace({
     String elementId = 'stepquest-camera-preview',
   }) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    // Generate a consistent pseudo-random 128D embedding vector for simulation
-    final rnd = Random(42);
-    final vector = List<double>.generate(128, (_) => (rnd.nextDouble() * 2) - 1);
-    final jsonStr = jsonEncode(vector);
-
-    return FaceDetectionResult.successResult(
-      faceEmbeddingJson: jsonStr,
-      confidence: 96.5,
+    return FaceDetectionResult.failureResult(
+      'La reconnaissance faciale est disponible dans la version Web uniquement.',
     );
   }
 

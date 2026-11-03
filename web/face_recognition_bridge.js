@@ -9,25 +9,15 @@
   window.StepQuestFaceAPI = {
     isLoaded: false,
     isLoading: false,
-    loadAttempted: false,
+    modelLoadPromise: null,
     activeStreams: {},
 
-    // Chargement ultra-rapide avec timeout strict (4s max)
     async loadModels(modelsPath = 'models') {
       if (this.isLoaded) return true;
-      if (this.loadAttempted && !this.isLoaded) return false;
+      if (this.modelLoadPromise) return this.modelLoadPromise;
 
       this.isLoading = true;
-      this.loadAttempted = true;
-
-      const timeoutPromise = new Promise((resolve) =>
-        setTimeout(() => {
-          console.warn('StepQuest: Timeout chargement modèles IA (4s) — passage en mode extracteur direct');
-          resolve(false);
-        }, 4000)
-      );
-
-      const loadPromise = (async () => {
+      this.modelLoadPromise = (async () => {
         try {
           if (typeof faceapi === 'undefined') {
             console.warn('StepQuest: face-api.js non disponible');
@@ -56,9 +46,13 @@
         }
       })();
 
-      const result = await Promise.race([loadPromise, timeoutPromise]);
-      this.isLoading = false;
-      return result;
+      try {
+        const result = await this.modelLoadPromise;
+        if (!result) this.modelLoadPromise = null;
+        return result;
+      } finally {
+        this.isLoading = false;
+      }
     },
 
     // Démarrer la webcam sur l'élément vidéo créé par Flutter (HtmlElementView)
@@ -148,66 +142,25 @@
       }
     },
 
-    // Extraction 128D hybride (face-api si dispo, sinon analyse spatiale directe en 15ms)
     async detectFaceDescriptor(videoElementId = 'stepquest-camera-preview') {
       const video = document.getElementById(videoElementId);
 
-      // Détection neuronale via face-api.js (modèles chargés)
-      if (this.isLoaded && typeof faceapi !== 'undefined' && video) {
-        try {
-          const detection = await faceapi
-            .detectSingleFace(video)
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-
-          if (detection && detection.descriptor) {
-            console.log('✅ StepQuest: Détection faciale neuronale réussie');
-            return Array.from(detection.descriptor);
-          }
-        } catch (e) {
-          console.warn('StepQuest: Détection neuronale échouée, passage à l\'extracteur spatial');
-        }
+      if (!this.isLoaded || typeof faceapi === 'undefined' || !video || !video.videoWidth) {
+        return null;
       }
 
-      // Extracteur biométrique spatial haute vitesse (128 descripteurs)
       try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 16;
-        canvas.height = 8; // 16x8 = 128 points
-        const ctx = canvas.getContext('2d');
+        const detection = await faceapi
+          .detectSingleFace(video)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
 
-        if (video && video.videoWidth > 0) {
-          // Crop centré sur la zone du visage
-          const vw = video.videoWidth;
-          const vh = video.videoHeight;
-          const cropSize = Math.min(vw, vh) * 0.7;
-          const sx = (vw - cropSize) / 2;
-          const sy = (vh - cropSize) / 2;
-          ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, 16, 8);
-        } else {
-          // Fallback déterministe si pas de vidéo
-          ctx.fillStyle = '#4A90E2';
-          ctx.fillRect(0, 0, 16, 8);
-        }
-
-        const imgData = ctx.getImageData(0, 0, 16, 8).data;
-        const descriptor = [];
-        for (let i = 0; i < 128; i++) {
-          const idx = i * 4;
-          // Luminance normalisée entre -1.0 et +1.0
-          const lum = (0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2]) / 128.0 - 1.0;
-          descriptor.push(Number(lum.toFixed(4)));
-        }
-
-        return descriptor;
+        if (!detection || !detection.descriptor) return null;
+        console.log('✅ StepQuest: Détection faciale réussie');
+        return Array.from(detection.descriptor);
       } catch (err) {
-        console.error('StepQuest: Erreur extraction descripteur :', err);
-        // Vecteur de secours pseudo-aléatoire
-        const fallback = [];
-        for (let i = 0; i < 128; i++) {
-          fallback.push(Number((Math.sin(i * 1.5)).toFixed(4)));
-        }
-        return fallback;
+        console.error('StepQuest: Erreur de détection faciale :', err);
+        return null;
       }
     },
 

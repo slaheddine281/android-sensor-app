@@ -48,21 +48,28 @@ class FaceRecognitionPlatformImpl {
     String elementId = 'stepquest-camera-preview',
   }) async {
     try {
+      final modelsLoaded = await _jsLoadModels('models'.toJS).toDart;
+      if (!modelsLoaded.toDart) {
+        return FaceDetectionResult.failureResult(
+          'Les modèles de reconnaissance faciale ne sont pas chargés. Vérifiez la connexion puis réessayez.',
+        );
+      }
+
       final descriptorJs =
           await _jsDetectFaceDescriptor(elementId.toJS).toDart;
 
       if (descriptorJs == null) {
         return FaceDetectionResult.failureResult(
-            'Aucun visage détecté. Veuillez bien regarder la caméra.');
+            'Aucun visage détecté. Placez votre visage devant la caméra puis réessayez.');
       }
 
       // Convert JS Array of doubles to Dart List<double>
       final jsArray = descriptorJs as JSArray<JSNumber>;
       final dartList = jsArray.toDart.map((n) => n.toDartDouble).toList();
 
-      if (dartList.isEmpty) {
+      if (dartList.length != 128) {
         return FaceDetectionResult.failureResult(
-            'Échec de l\'extraction des caractéristiques faciales.');
+        'Le descripteur facial reçu est invalide. Réessayez.');
       }
 
       final photo = _jsCapturePhoto(elementId.toJS)?.toDart;
@@ -83,9 +90,12 @@ class FaceRecognitionPlatformImpl {
     try {
       final List<dynamic> d1 = jsonDecode(storedEmbedding);
       final List<dynamic> d2 = jsonDecode(currentEmbedding);
+      if (d1.length != 128 || d2.length != 128) {
+        return FaceMatchResult.noMatch(distance: 1.0, confidencePercentage: 0);
+      }
 
       double sum = 0;
-      for (int i = 0; i < d1.length && i < d2.length; i++) {
+      for (int i = 0; i < d1.length; i++) {
         final diff = (d1[i] as num).toDouble() - (d2[i] as num).toDouble();
         sum += diff * diff;
       }

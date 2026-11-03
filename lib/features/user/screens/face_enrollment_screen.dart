@@ -64,13 +64,18 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       _cameraActive = camOk;
       _statusMessage = camOk
           ? 'Placez votre visage dans l\'ovale puis appuyez sur "Capturer".'
-          : 'Impossible d\'accéder à la caméra. Vérifiez les permissions.';
+          : kIsWeb
+              ? 'Impossible d\'accéder à la caméra. Vérifiez les permissions.'
+              : 'La reconnaissance faciale est disponible dans la version Web uniquement.';
     });
 
-    // Charger les modèles IA en arrière-plan sans bloquer l'interface
-    faceService.initializeModels().then((_) {
-      if (mounted) {
-        setState(() => _modelLoading = false);
+    final modelsLoaded = await faceService.initializeModels();
+    if (!mounted) return;
+    setState(() {
+      _modelLoading = false;
+      if (camOk && !modelsLoaded) {
+        _statusMessage =
+            'Modèles IA non chargés. Vérifiez la connexion puis réessayez.';
       }
     });
   }
@@ -316,7 +321,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                     fit: StackFit.expand,
                     children: [
                       // ── Flux caméra via HtmlElementView (Web uniquement) ──
-                      if (kIsWeb && _cameraActive)
+                      if (kIsWeb)
                         buildCameraView()
                       else
                         // Placeholder sombre si caméra inactive
@@ -488,7 +493,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                     : 'Capturer mon visage',
                 icon: Icons.camera_alt_outlined,
                 isLoading: _isProcessing,
-                onPressed: _isProcessing ? null : _handleCaptureFace,
+                onPressed: _isProcessing || !_cameraActive
+                  ? null
+                  : _handleCaptureFace,
               ),
               const SizedBox(height: 12),
 
