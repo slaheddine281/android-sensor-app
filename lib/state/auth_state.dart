@@ -75,6 +75,9 @@ class AuthState extends ChangeNotifier {
             if (userState.findById(profile.id) == null) {
               userState.addUser(profile);
             }
+            if (profile.isAdmin) {
+              await userState.loadUsersFromSupabase();
+            }
             _isLoading = false;
             notifyListeners();
             return true;
@@ -147,6 +150,10 @@ class AuthState extends ChangeNotifier {
           userState.addUser(updated);
         } else {
           userState.updateUser(updated);
+        }
+
+        if (updated.isAdmin) {
+          await userState.loadUsersFromSupabase();
         }
 
         notificationState.addNotification(
@@ -285,6 +292,10 @@ class AuthState extends ChangeNotifier {
           userState.addUser(updated);
         } else {
           userState.updateUser(updated);
+        }
+
+        if (updated.isAdmin) {
+          await userState.loadUsersFromSupabase();
         }
 
         notificationState.addNotification(

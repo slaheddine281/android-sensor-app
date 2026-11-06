@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// User roles available in StepQuest
 enum UserRole {
   user('Utilisateur'),
@@ -170,11 +172,25 @@ class AppUser {
   }
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
+    final rawFace = map['face_embedding'] ?? map['faceEmbedding'];
+    final String? faceEmbeddingStr = rawFace is List
+        ? jsonEncode(rawFace)
+        : rawFace?.toString();
+
+    final rawFp = map['biometric_fingerprint_enabled'] ??
+        map['biometricFingerprintEnabled'];
+    final rawFaceBio =
+        map['biometric_face_enabled'] ?? map['biometricFaceEnabled'];
+
+    final rawHeight = map['height_cm'] ?? map['heightCm'];
+    final rawWeight = map['weight_kg'] ?? map['weightKg'];
+    final rawLevel = map['level'];
+
     return AppUser(
       id: map['id']?.toString() ?? '',
       fullName: (map['full_name'] ?? map['fullName'] ?? '') as String,
       email: (map['email'] ?? '') as String,
-      avatarUrl: (map['avatar_url'] ?? map['avatarUrl']) as String?,
+      avatarUrl: (map['avatar_url'] ?? map['avatarUrl'])?.toString(),
       role: UserRole.fromString((map['role'] ?? 'user').toString()),
       status: UserStatus.fromString((map['status'] ?? 'active').toString()),
       createdAt: DateTime.tryParse(
@@ -184,22 +200,25 @@ class AppUser {
           ? DateTime.tryParse(
               (map['last_login_at'] ?? map['lastLoginAt']).toString())
           : null,
-      biometricFingerprintEnabled: (map['biometric_fingerprint_enabled'] ??
-              map['biometricFingerprintEnabled']) as bool? ??
-          false,
-      biometricFaceEnabled: (map['biometric_face_enabled'] ??
-              map['biometricFaceEnabled']) as bool? ??
-          false,
-      faceEmbedding: (map['face_embedding'] ?? map['faceEmbedding']) as String?,
-      facePhotoUrl: (map['face_photo_url'] ?? map['facePhotoUrl']) as String?,
-      heightCm: (map['height_cm'] ?? map['heightCm']) as int?,
-      weightKg: ((map['weight_kg'] ?? map['weightKg']) as num?)?.toDouble(),
+      biometricFingerprintEnabled: rawFp == true || rawFp == 1 || rawFp == 'true',
+      biometricFaceEnabled:
+          rawFaceBio == true || rawFaceBio == 1 || rawFaceBio == 'true',
+      faceEmbedding: faceEmbeddingStr,
+      facePhotoUrl: (map['face_photo_url'] ?? map['facePhotoUrl'])?.toString(),
+      heightCm: rawHeight is num
+          ? rawHeight.toInt()
+          : int.tryParse(rawHeight?.toString() ?? ''),
+      weightKg: rawWeight is num
+          ? rawWeight.toDouble()
+          : double.tryParse(rawWeight?.toString() ?? ''),
       birthDate: (map['birth_date'] ?? map['birthDate']) != null
           ? DateTime.tryParse(
               (map['birth_date'] ?? map['birthDate']).toString())
           : null,
-      level: (map['level'] as int?) ?? 1,
-      deviceInfo: (map['device_info'] ?? map['deviceInfo']) as String?,
+      level: rawLevel is num
+          ? rawLevel.toInt()
+          : (int.tryParse(rawLevel?.toString() ?? '') ?? 1),
+      deviceInfo: (map['device_info'] ?? map['deviceInfo'])?.toString(),
     );
   }
 }

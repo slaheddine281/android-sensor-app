@@ -20,6 +20,10 @@ class UserState extends ChangeNotifier {
       _users.where((u) => u.status == UserStatus.suspended).length;
   int get adminUsersCount =>
       _users.where((u) => u.role == UserRole.admin).length;
+  int get faceIdUsersCount =>
+      _users.where((u) => u.biometricFaceEnabled || u.hasFaceRegistered).length;
+  int get fingerprintUsersCount =>
+      _users.where((u) => u.biometricFingerprintEnabled).length;
 
   SupabaseClient? get _supabase => SupabaseConstants.client;
 
@@ -78,17 +82,34 @@ class UserState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final data = await sb
-          .from(SupabaseConstants.profilesTable)
-          .select()
-          .order('created_at', ascending: false);
+      dynamic data;
+      try {
+        data = await sb
+            .from(SupabaseConstants.profilesTable)
+            .select()
+            .order('created_at', ascending: false);
+      } catch (orderErr) {
+        debugPrint('order(created_at) failed, fallback without order: $orderErr');
+        data = await sb.from(SupabaseConstants.profilesTable).select();
+      }
 
-      _users.clear();
-      for (final row in data) {
-        try {
-          _users.add(AppUser.fromMap(row));
-        } catch (e) {
-          debugPrint('UserState.loadUsers parse error: $e for row $row');
+      if (data is List) {
+        final List<AppUser> loaded = [];
+        for (final row in data) {
+          try {
+            if (row is Map<String, dynamic>) {
+              loaded.add(AppUser.fromMap(row));
+            } else if (row is Map) {
+              loaded.add(AppUser.fromMap(Map<String, dynamic>.from(row)));
+            }
+          } catch (e) {
+            debugPrint('UserState.loadUsers parse error: $e for row $row');
+          }
+        }
+
+        if (loaded.isNotEmpty) {
+          _users.clear();
+          _users.addAll(loaded);
         }
       }
     } catch (e) {
@@ -101,9 +122,26 @@ class UserState extends ChangeNotifier {
 
   void addUser(AppUser user) {
     // Avoid duplicates
-    if (_users.any((u) => u.id == user.id)) return;
-    _users.insert(0, user);
+    final existingIdx = _users.indexWhere((u) => u.id == user.id);
+    if (existingIdx != -1) {
+      _users[existingIdx] = user;
+    } else {
+      _users.insert(0, user);
+    }
     notifyListeners();
+  }
+
+  /// Create user in Supabase and local state (admin use)
+  Future<void> createUserInSupabase(AppUser newUser) async {
+    final sb = _supabase;
+    if (sb != null) {
+      try {
+        await sb.from(SupabaseConstants.profilesTable).upsert(newUser.toMap());
+      } catch (e) {
+        debugPrint('createUserInSupabase error: $e');
+      }
+    }
+    addUser(newUser);
   }
 
   void updateUser(AppUser updatedUser) {

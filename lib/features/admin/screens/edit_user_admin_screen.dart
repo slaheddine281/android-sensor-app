@@ -54,7 +54,7 @@ class _EditUserAdminScreenState extends State<EditUserAdminScreen> {
     super.dispose();
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
     final user = context.users.findById(widget.userId);
@@ -86,11 +86,14 @@ class _EditUserAdminScreenState extends State<EditUserAdminScreen> {
       status: _selectedStatus,
     );
 
-    context.users.updateUser(updated);
+    await context.users.updateUserInSupabase(updated);
+
+    if (!mounted) return;
 
     context.notifications.addNotification(
       title: 'Profil utilisateur modifié',
-      message: 'Les informations administratives de ${updated.fullName} ont été mises à jour.',
+      message:
+          'Les informations administratives de ${updated.fullName} ont été mises à jour.',
       type: NotificationType.profileUpdated,
       relatedUserId: updated.id,
     );

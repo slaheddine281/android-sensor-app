@@ -219,7 +219,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen>
 
               // Tab View Content
               SizedBox(
-                height: 280,
+                height: 380,
                 child: TabBarView(
                   controller: _tabController,
                   children: [
@@ -315,15 +315,41 @@ class _UserDetailsScreenState extends State<UserDetailsScreen>
           ),
           const Divider(),
           _buildDetailRow(
+            label: 'Niveau',
+            value: 'Niveau ${user.level}',
+          ),
+          if (user.heightCm != null || user.weightKg != null) ...[
+            const Divider(),
+            _buildDetailRow(
+              label: 'Morphologie',
+              value: '${user.heightCm ?? "-"} cm · ${user.weightKg ?? "-"} kg',
+            ),
+          ],
+          if (user.birthDate != null) ...[
+            const Divider(),
+            _buildDetailRow(
+              label: 'Date de naissance',
+              value: AppDateFormatter.formatShort(user.birthDate!),
+            ),
+          ],
+          const Divider(),
+          _buildDetailRow(
             label: 'Biométrie',
             value: user.biometricFingerprintEnabled && user.biometricFaceEnabled
-                ? 'Empreinte (Activée) · Visage (Activée)'
+                ? 'Empreinte (Activée) · Face ID (Activé)'
                 : user.biometricFingerprintEnabled
                     ? 'Empreinte (Activée)'
-                    : user.biometricFaceEnabled
-                        ? 'Visage (Activé)'
+                    : (user.biometricFaceEnabled || user.hasFaceRegistered)
+                        ? 'Face ID (Activé)'
                         : 'Aucune',
           ),
+          if (user.hasFaceRegistered) ...[
+            const Divider(),
+            _buildDetailRow(
+              label: 'Face ID',
+              value: 'Modèle biométrique 128D configuré',
+            ),
+          ],
         ],
       ),
     );
