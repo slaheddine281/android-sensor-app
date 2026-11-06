@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../features/admin/screens/add_user_admin_screen.dart';
 import '../../features/admin/screens/admin_dashboard_screen.dart';
 import '../../features/admin/screens/admin_login_screen.dart';
 import '../../features/admin/screens/edit_user_admin_screen.dart';
@@ -41,6 +42,7 @@ class AppRoutes {
   static const String adminUsers = '/admin-users';
   static const String adminUserDetails = '/admin-user-details';
   static const String adminEditUser = '/admin-edit-user';
+  static const String adminAddUser = '/admin-add-user';
 
   // Shared
   static const String biometricAuth = '/biometric-auth';
@@ -122,6 +124,14 @@ class AppRoutes {
         }
         return MaterialPageRoute(
           builder: (_) => EditUserAdminScreen(userId: userId),
+        );
+
+      case adminAddUser:
+        if (!authState.isAdmin) {
+          return MaterialPageRoute(builder: (_) => const AdminLoginScreen());
+        }
+        return MaterialPageRoute(
+          builder: (_) => const AddUserAdminScreen(),
         );
 
       case biometricAuth:

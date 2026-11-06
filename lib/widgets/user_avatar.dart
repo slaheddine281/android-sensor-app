@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../models/app_user.dart';
@@ -46,23 +47,53 @@ class UserAvatar extends StatelessWidget {
     return colors[hash % colors.length];
   }
 
+  ImageProvider? get _imageProvider {
+    final facePhoto = user?.facePhotoUrl;
+    if (facePhoto != null && facePhoto.startsWith('data:image')) {
+      try {
+        final commaIdx = facePhoto.indexOf(',');
+        if (commaIdx != -1) {
+          final bytes = base64Decode(facePhoto.substring(commaIdx + 1));
+          return MemoryImage(bytes);
+        }
+      } catch (_) {}
+    }
+
+    final avatar = user?.avatarUrl;
+    if (avatar != null &&
+        (avatar.startsWith('http://') || avatar.startsWith('https://'))) {
+      return NetworkImage(avatar);
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final diameter = radius * 2;
+    final image = _imageProvider;
 
     Widget avatarWidget = Container(
       width: diameter,
       height: diameter,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            _avatarColor,
-            _avatarColor.withValues(alpha: 0.8),
-          ],
-        ),
+        gradient: image == null
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _avatarColor,
+                  _avatarColor.withValues(alpha: 0.8),
+                ],
+              )
+            : null,
+        image: image != null
+            ? DecorationImage(
+                image: image,
+                fit: BoxFit.cover,
+              )
+            : null,
         border: Border.all(
           color: borderColor ?? Colors.white,
           width: borderColor != null ? 3 : 1.5,
@@ -75,17 +106,19 @@ class UserAvatar extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: Text(
-          _initials,
-          style: TextStyle(
-            fontSize: radius * 0.75,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            letterSpacing: -0.5,
-          ),
-        ),
-      ),
+      child: image == null
+          ? Center(
+              child: Text(
+                _initials,
+                style: TextStyle(
+                  fontSize: radius * 0.75,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            )
+          : null,
     );
 
     if (showEditBadge) {
