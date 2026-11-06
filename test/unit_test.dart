@@ -209,5 +209,17 @@ void main() {
       expect(authState.currentUser?.fullName, 'Nouveau Membre');
       expect(userState.findByEmail('nouveau@example.com'), isNotNull);
     });
+
+    test('Password reset request and recovery update flow', () async {
+      final requested = await authState.requestPasswordReset('amine@example.com');
+      expect(requested, true);
+
+      authState.setPasswordRecovery(true);
+      expect(authState.isPasswordRecovery, true);
+
+      final updated = await authState.updatePassword('brandNewPassword123');
+      expect(updated, true);
+      expect(authState.isPasswordRecovery, false);
+    });
   });
 }

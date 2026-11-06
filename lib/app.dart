@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthState;
+import 'core/constants/supabase_constants.dart';
 import 'core/navigation/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'services/mock_biometric_service.dart';
@@ -17,12 +20,14 @@ class StepQuestApp extends StatefulWidget {
 }
 
 class _StepQuestAppState extends State<StepQuestApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late final AuthState _authState;
   late final UserState _userState;
   late final NotificationState _notificationState;
   late final AppSettingsState _settingsState;
   late final MockBiometricService _biometricService;
   late final FaceRecognitionService _faceService;
+  StreamSubscription? _authSubscription;
 
   @override
   void initState() {
@@ -33,10 +38,23 @@ class _StepQuestAppState extends State<StepQuestApp> {
     _settingsState = AppSettingsState();
     _biometricService = MockBiometricService();
     _faceService = FaceRecognitionService();
+
+    // Écouter les événements d'authentification Supabase (ex: lien de récupération de mot de passe)
+    _authSubscription =
+        SupabaseConstants.client?.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        _authState.setPasswordRecovery(true);
+        _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          AppRoutes.resetPassword,
+          (route) => false,
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _authState.dispose();
     _userState.dispose();
     _notificationState.dispose();
@@ -62,6 +80,7 @@ class _StepQuestAppState extends State<StepQuestApp> {
         ]),
         builder: (context, _) {
           return MaterialApp(
+            navigatorKey: _navigatorKey,
             title: 'StepQuest',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,

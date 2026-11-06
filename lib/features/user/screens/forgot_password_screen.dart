@@ -3,6 +3,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/app_text_field.dart';
+import 'reset_password_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -190,7 +191,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             child: const Center(
               child: Icon(
-                Icons.check_circle_outline_rounded,
+                Icons.mark_email_read_rounded,
                 size: 52,
                 color: AppColors.secondary,
               ),
@@ -199,7 +200,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Lien de réinitialisation simulé !',
+          'E-mail envoyé avec succès !',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 22,
@@ -209,16 +210,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          'Dans un environnement de production avec serveur distant, un lien de réinitialisation sécurisé aurait été envoyé à :\n${_emailController.text}',
+          'Un lien de réinitialisation sécurisé a été envoyé à l\'adresse :\n${_emailController.text}\n\nConsultez votre boîte de réception et cliquez sur le lien reçu pour définir votre nouveau mot de passe.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
             color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
-            height: 1.4,
+            height: 1.45,
           ),
         ),
         const SizedBox(height: 28),
         AppButton(
+          label: 'Saisir mon nouveau mot de passe',
+          icon: Icons.lock_reset_rounded,
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        AppButton.secondary(
           label: 'Retour à la connexion',
           onPressed: () => Navigator.of(context).pop(),
         ),

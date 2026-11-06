@@ -103,16 +103,54 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
+              final newPass = newPasswordController.text;
+              final confirmPass = confirmPasswordController.text;
+
+              if (newPass.length < 6) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Le mot de passe doit comporter au moins 6 caractères.'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
+
+              if (newPass != confirmPass) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Les nouveaux mots de passe ne correspondent pas.'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
+
               Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                      'Mot de passe mis à jour avec succès.'),
-                  backgroundColor: AppColors.secondary,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              final success = await context.auth.updatePassword(newPass);
+
+              if (!mounted) return;
+
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Mot de passe mis à jour avec succès.'),
+                    backgroundColor: AppColors.secondary,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(context.auth.errorMessage ?? 'Erreur lors de la mise à jour.'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
             child: const Text('Valider'),
           ),

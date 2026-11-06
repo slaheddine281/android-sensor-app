@@ -11,6 +11,7 @@ class AuthState extends ChangeNotifier {
   AppUser? _currentUser;
   bool _rememberMe = true;
   bool _isLoading = false;
+  bool _isPasswordRecovery = false;
   String? _errorMessage;
 
   AppUser? get currentUser => _currentUser;
@@ -18,9 +19,15 @@ class AuthState extends ChangeNotifier {
   bool get isAdmin => _currentUser?.isAdmin ?? false;
   bool get rememberMe => _rememberMe;
   bool get isLoading => _isLoading;
+  bool get isPasswordRecovery => _isPasswordRecovery;
   String? get errorMessage => _errorMessage;
 
   SupabaseClient? get _supabase => SupabaseConstants.client;
+
+  void setPasswordRecovery(bool value) {
+    _isPasswordRecovery = value;
+    notifyListeners();
+  }
 
   void setRememberMe(bool value) {
     _rememberMe = value;
@@ -646,12 +653,57 @@ class AuthState extends ChangeNotifier {
     final sb = _supabase;
     if (sb != null) {
       try {
-        await sb.auth.resetPasswordForEmail(email.trim().toLowerCase());
+        String? redirectTo;
+        if (kIsWeb) {
+          redirectTo = Uri.base.origin;
+        }
+        await sb.auth.resetPasswordForEmail(
+          email.trim().toLowerCase(),
+          redirectTo: redirectTo,
+        );
       } catch (e) {
         debugPrint('requestPasswordReset error: $e');
+        _errorMessage = _mapAuthError(e.toString());
+        _isLoading = false;
+        notifyListeners();
+        return false;
       }
     }
 
+    _isLoading = false;
+    notifyListeners();
+    return true;
+  }
+
+  /// Update password in Supabase for current recovery or authenticated session
+  Future<bool> updatePassword(String newPassword) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    final sb = _supabase;
+    if (sb != null) {
+      try {
+        final res = await sb.auth.updateUser(
+          UserAttributes(password: newPassword),
+        );
+        if (res.user != null) {
+          _isPasswordRecovery = false;
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        }
+      } catch (e) {
+        debugPrint('updatePassword error: $e');
+        _errorMessage = _mapAuthError(e.toString());
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+    }
+
+    // Mode simulation / hors-ligne pour les tests
+    _isPasswordRecovery = false;
     _isLoading = false;
     notifyListeners();
     return true;

@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../state/app_state_provider.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
 import 'login_screen.dart';
+import 'reset_password_screen.dart';
 import 'user_home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -40,15 +42,34 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkSession() async {
-    // Simulated check of existing session
-    await Future.delayed(const Duration(milliseconds: 2200));
+    // Vérifier si l'utilisateur arrive depuis un lien de réinitialisation de mot de passe (e-mail Supabase)
+    final isRecoveryFromUrl =
+        kIsWeb && Uri.base.toString().contains('type=recovery');
+
+    await Future.delayed(const Duration(milliseconds: 1600));
     if (!mounted) return;
 
     final authState = context.auth;
     final userState = context.users;
+
+    if (isRecoveryFromUrl || authState.isPasswordRecovery) {
+      authState.setPasswordRecovery(true);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+      );
+      return;
+    }
+
     final hasSession = await authState.checkExistingSession(userState);
 
     if (!mounted) return;
+
+    if (authState.isPasswordRecovery) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+      );
+      return;
+    }
 
     if (hasSession && authState.currentUser != null) {
       if (authState.currentUser!.isAdmin) {
