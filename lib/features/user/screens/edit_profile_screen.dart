@@ -268,108 +268,82 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Reconnaissance Faciale (Face ID)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF1E293B)
-                        : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: user.hasFaceRegistered
-                          ? AppColors.secondary.withValues(alpha: 0.5)
-                          : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                // Reconnaissance Faciale (Face ID) - Raccourci vers la configuration
+                InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const FaceEnrollmentScreen(),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.navyCard : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: user.hasFaceRegistered
+                            ? AppColors.secondary.withValues(alpha: 0.4)
+                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: user.hasFaceRegistered
-                                  ? AppColors.secondary.withValues(alpha: 0.15)
-                                  : AppColors.primarySoft,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.face_rounded,
-                              color: user.hasFaceRegistered
-                                  ? AppColors.secondary
-                                  : AppColors.primary,
-                              size: 24,
-                            ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: user.hasFaceRegistered
+                                ? AppColors.secondary.withValues(alpha: 0.15)
+                                : AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Reconnaissance Faciale (Face ID)',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : AppColors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  user.hasFaceRegistered
-                                      ? 'Visage enregistré et opérationnel'
-                                      : 'Aucun visage configuré',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: user.hasFaceRegistered
-                                        ? AppColors.secondary
-                                        : AppColors.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          child: Icon(
+                            Icons.face_rounded,
+                            color: user.hasFaceRegistered
+                                ? AppColors.secondary
+                                : AppColors.primary,
+                            size: 22,
                           ),
-                          if (user.hasFaceRegistered)
-                            const Icon(
-                              Icons.check_circle_rounded,
-                              color: AppColors.secondary,
-                              size: 20,
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.primary),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                          icon: const Icon(Icons.camera_alt_outlined, size: 18),
-                          label: Text(
-                            user.hasFaceRegistered
-                                ? 'Modifier / Scanner à nouveau mon visage'
-                                : 'Ajouter / Enregistrer mon visage',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          onPressed: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const FaceEnrollmentScreen(),
-                              ),
-                            );
-                            if (mounted) setState(() {});
-                          },
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Reconnaissance Faciale (Face ID)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                user.hasFaceRegistered
+                                    ? 'Configuré & Actif'
+                                    : 'Non configuré — Toucher pour configurer',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: user.hasFaceRegistered
+                                      ? AppColors.secondary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 14,
+                          color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 32),

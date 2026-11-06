@@ -270,25 +270,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         ),
                         const Divider(),
                         _buildInfoRow(
-                          icon: Icons.face_retouching_natural_rounded,
-                          label: 'Reconnaissance Faciale',
+                          icon: Icons.shield_outlined,
+                          label: 'Sécurité Biométrique',
                           value: user.hasFaceRegistered
-                              ? 'Configuré (Face ID actif)'
-                              : 'Non configuré',
-                          isDark: isDark,
-                        ),
-                        const Divider(),
-                        _buildInfoRow(
-                          icon: Icons.security_outlined,
-                          label: 'Biométrie active',
-                          value: user.biometricFingerprintEnabled &&
-                                  user.biometricFaceEnabled
-                              ? 'Empreinte · Visage'
-                              : user.biometricFingerprintEnabled
-                                  ? 'Empreinte uniquement'
-                                  : user.biometricFaceEnabled
-                                      ? 'Visage uniquement'
-                                      : 'Aucune',
+                              ? 'Face ID configuré'
+                              : (user.biometricFingerprintEnabled
+                                  ? 'Empreinte active'
+                                  : 'Désactivée'),
                           isDark: isDark,
                         ),
                       ],
@@ -299,8 +287,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   // Face ID enrollment button
                   AppButton(
                     label: user.hasFaceRegistered
-                        ? 'Gérer mon visage (Face ID)'
-                        : 'Enregistrer mon visage (Face ID)',
+                        ? 'Gérer mon Face ID'
+                        : 'Activer la Reconnaissance Faciale (Face ID)',
                     icon: Icons.face_rounded,
                     onPressed: () {
                       Navigator.of(context).push(

@@ -24,7 +24,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   bool _isProcessing = false;
   bool _cameraActive = false;
-  bool _modelLoading = true;
+  bool _modelLoading = false;
   String _statusMessage = 'Démarrage de la caméra...';
 
   @override
@@ -36,11 +36,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
-    _scanAnimation = Tween<double>(begin: 0.05, end: 0.88).animate(
+    _scanAnimation = Tween<double>(begin: 0.06, end: 0.90).animate(
       CurvedAnimation(parent: _scanController, curve: Curves.easeInOut),
     );
 
-    // Initialiser la caméra après le premier frame (évite l'erreur initState)
+    // Initialiser la caméra après le premier rendu
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initCamera();
     });
@@ -52,7 +52,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     setState(() {
       _isProcessing = false;
       _cameraActive = false;
-      _statusMessage = 'Démarrage de la caméra...';
+      _statusMessage = 'Ouverture de la caméra...';
     });
 
     final faceService = context.faceRecognition;
@@ -63,37 +63,53 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     setState(() {
       _cameraActive = camOk;
       _statusMessage = camOk
-          ? 'Placez votre visage dans l\'ovale puis appuyez sur "Capturer".'
-          : kIsWeb
-              ? 'Impossible d\'accéder à la caméra. Vérifiez les permissions.'
-              : 'La reconnaissance faciale est disponible dans la version Web uniquement.';
+          ? 'Placez votre visage au centre du cadre puis appuyez sur "Capturer".'
+          : 'Accès caméra en attente. Vérifiez que votre navigateur autorise la webcam.';
     });
 
-    final modelsLoaded = await faceService.initializeModels();
-    if (!mounted) return;
-    setState(() {
-      _modelLoading = false;
-      if (camOk && !modelsLoaded) {
-        _statusMessage =
-            'Modèles IA non chargés. Vérifiez la connexion puis réessayez.';
-      }
-    });
+    // Préchargement des modèles d'analyse faciale
+    if (!faceService.modelsLoaded) {
+      setState(() => _modelLoading = true);
+      faceService.initializeModels().then((_) {
+        if (mounted) setState(() => _modelLoading = false);
+      });
+    }
   }
 
   @override
   void dispose() {
     _scanController.dispose();
-    context.faceRecognition.stopCamera();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // ignore: use_build_context_synchronously
+      context.faceRecognition.stopCamera();
+    });
     super.dispose();
   }
 
   Future<void> _handleCaptureFace() async {
+    if (_isProcessing) return;
+
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Analyse des caractéristiques faciales en cours...';
+      _statusMessage = 'Extraction des 128 points biométriques en cours...';
     });
 
     final faceService = context.faceRecognition;
+
+    // Si la caméra n'était pas active, essayer de la réactiver
+    if (!_cameraActive) {
+      final camOk = await faceService.startCamera();
+      if (!camOk) {
+        if (!mounted) return;
+        setState(() {
+          _isProcessing = false;
+          _statusMessage = 'Impossible d\'accéder à la caméra. Vérifiez les autorisations.';
+        });
+        return;
+      }
+      setState(() => _cameraActive = true);
+    }
+
     final result = await faceService.scanFace();
 
     if (!mounted) return;
@@ -118,7 +134,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
       setState(() {
         _isProcessing = false;
-        _statusMessage = '✓ Visage enregistré avec succès !';
+        _statusMessage = '✓ Empreinte faciale enregistrée et Face ID activé avec succès !';
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -133,7 +149,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
       setState(() {
         _isProcessing = false;
-        _statusMessage = result.message;
+        _statusMessage = result.message.isNotEmpty
+            ? result.message
+            : 'Aucun visage net détecté. Placez-vous bien face à la caméra.';
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -152,7 +170,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       builder: (ctx) => AlertDialog(
         title: const Text('Supprimer mon visage'),
         content: const Text(
-          'Voulez-vous supprimer les données biométriques de votre visage ?',
+          'Voulez-vous supprimer les données biométriques de votre visage ? Vous ne pourrez plus vous connecter avec Face ID.',
         ),
         actions: [
           TextButton(
@@ -188,7 +206,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     if (!mounted) return;
 
     setState(() {
-      _statusMessage = 'Données biométriques supprimées.';
+      _statusMessage = 'Données biométriques faciales supprimées.';
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -210,322 +228,312 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
       appBar: const AppAppBar(title: 'Reconnaissance Faciale'),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Carte d'état ──────────────────────────────────────────────
-              AppCard(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: hasFace
-                            ? AppColors.secondary.withValues(alpha: 0.15)
-                            : AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(
-                        hasFace
-                            ? Icons.face_retouching_natural_rounded
-                            : Icons.face_rounded,
-                        color: accentColor,
-                        size: 30,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Carte d'état Face ID ─────────────────────────────────
+                  AppCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: hasFace
+                                ? AppColors.secondary.withValues(alpha: 0.15)
+                                : AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
                             hasFace
-                                ? 'Visage configuré'
-                                : 'Aucun visage enregistré',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? Colors.white
-                                  : AppColors.textPrimary,
+                                ? Icons.face_retouching_natural_rounded
+                                : Icons.face_rounded,
+                            color: accentColor,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                hasFace
+                                    ? 'Face ID configuré'
+                                    : 'Aucun visage enregistré',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                hasFace
+                                    ? 'Actif — Déverrouillez votre compte instantanément.'
+                                    : 'Enregistrez votre visage pour activer la connexion rapide.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (hasFace)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'ACTIF',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.secondary,
+                                letterSpacing: 0.8,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 4),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // ── Fenêtre Caméra & Guide Facial ────────────────────────
+                  Center(
+                    child: Container(
+                      width: 240,
+                      height: 290,
+                      clipBehavior: Clip.hardEdge,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: _cameraActive
+                              ? accentColor
+                              : const Color(0xFF334155),
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (_cameraActive ? accentColor : Colors.black)
+                                .withValues(alpha: 0.3),
+                            blurRadius: 26,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // ── Flux Caméra ──────────────────────────────────
+                          if (kIsWeb)
+                            buildCameraView()
+                          else
+                            const Center(
+                              child: Icon(
+                                Icons.face_rounded,
+                                size: 64,
+                                color: Colors.white24,
+                              ),
+                            ),
+
+                          // ── Ovale guide facial ───────────────────────────
+                          Center(
+                            child: Container(
+                              width: 170,
+                              height: 225,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(110),
+                                border: Border.all(
+                                  color: _cameraActive
+                                      ? accentColor.withValues(alpha: 0.85)
+                                      : Colors.white.withValues(alpha: 0.3),
+                                  width: 2.2,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // ── Laser de scan animé ──────────────────────────
+                          if (_isProcessing)
+                            AnimatedBuilder(
+                              animation: _scanAnimation,
+                              builder: (context, _) {
+                                return Positioned(
+                                  top: 280 * _scanAnimation.value,
+                                  left: 16,
+                                  right: 16,
+                                  child: Container(
+                                    height: 2.5,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.transparent,
+                                          AppColors.secondary,
+                                          AppColors.secondary,
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.secondary
+                                              .withValues(alpha: 0.8),
+                                          blurRadius: 10,
+                                          spreadRadius: 2,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+
+                          // ── Coins de visée Face ID ───────────────────────
+                          ..._buildCornerCrosshairs(accentColor),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Indicateur de modèles IA (si en cours) ────────────────
+                  if (_modelLoading)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: accentColor.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
-                            hasFace
-                                ? 'Face ID actif — connexion par reconnaissance faciale.'
-                                : 'Scannez votre visage pour activer le Face ID.',
+                            'Optimisation des modèles biométriques...',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
                               color: isDark
-                                  ? const Color(0xFF94A3B8)
+                                  ? const Color(0xFF64748B)
                                   : AppColors.textSecondary,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    if (hasFace)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color:
-                              AppColors.secondary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'ACTIF',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.secondary,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
 
-              // ── Fenêtre caméra + guide facial ────────────────────────────
-              Center(
-                child: Container(
-                  width: 260,
-                  height: 320,
-                  clipBehavior: Clip.hardEdge,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: _cameraActive
-                          ? accentColor
-                          : const Color(0xFF334155),
-                      width: 2.5,
+                  // ── Message de statut ─────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF1E293B)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
+                      ),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_cameraActive ? accentColor : Colors.black)
-                            .withValues(alpha: 0.3),
-                        blurRadius: 28,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // ── Flux caméra via HtmlElementView (Web uniquement) ──
-                      if (kIsWeb)
-                        buildCameraView()
-                      else
-                        // Placeholder sombre si caméra inactive
-                        Container(
-                          color: const Color(0xFF0F172A),
-                          child: Center(
-                            child: Icon(
-                              _cameraActive
-                                  ? Icons.videocam_rounded
-                                  : Icons.videocam_off_rounded,
-                              size: 48,
-                              color: Colors.white.withValues(alpha: 0.2),
-                            ),
-                          ),
-                        ),
-
-                      // ── Ovale guide facial ────────────────────────────────
-                      Center(
-                        child: Container(
-                          width: 185,
-                          height: 248,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(120),
-                            border: Border.all(
-                              color: _cameraActive
-                                  ? accentColor.withValues(alpha: 0.85)
-                                  : Colors.white.withValues(alpha: 0.25),
-                              width: 2.5,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // ── Laser de scan animé (pendant traitement) ──────────
-                      if (_isProcessing)
-                        AnimatedBuilder(
-                          animation: _scanAnimation,
-                          builder: (context, _) {
-                            return Positioned(
-                              top: 310 * _scanAnimation.value,
-                              left: 20,
-                              right: 20,
-                              child: Container(
-                                height: 2.5,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.transparent,
-                                      AppColors.secondary,
-                                      AppColors.secondary,
-                                      Colors.transparent,
-                                    ],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.secondary
-                                          .withValues(alpha: 0.8),
-                                      blurRadius: 10,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                      // ── Coins de visée ────────────────────────────────────
-                      ..._buildCornerCrosshairs(accentColor),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // ── Barre de chargement des modèles IA ───────────────────────
-              if (_modelLoading)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: accentColor.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Chargement des modèles IA...',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark
-                              ? const Color(0xFF64748B)
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // ── Message de statut ─────────────────────────────────────────
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF1E293B)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark
-                        ? const Color(0xFF334155)
-                        : const Color(0xFFE2E8F0),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _isProcessing
-                          ? Icons.sync_rounded
-                          : (_statusMessage.startsWith('✓') ||
-                                  hasFace && _cameraActive)
-                              ? Icons.check_circle_rounded
-                              : _cameraActive
-                                  ? Icons.videocam_rounded
+                    child: Row(
+                      children: [
+                        Icon(
+                          _isProcessing
+                              ? Icons.sync_rounded
+                              : _statusMessage.startsWith('✓')
+                                  ? Icons.check_circle_rounded
                                   : Icons.info_outline_rounded,
-                      color: _isProcessing
-                          ? AppColors.primary
-                          : (_statusMessage.startsWith('✓') || hasFace)
+                          color: _statusMessage.startsWith('✓')
                               ? AppColors.secondary
                               : accentColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _statusMessage,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: isDark
-                              ? Colors.white70
-                              : AppColors.textPrimary,
+                          size: 20,
                         ),
-                      ),
-                    ),
-                    if (_isProcessing)
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.primary,
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _statusMessage,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: isDark
+                                  ? Colors.white70
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
                         ),
-                      ),
+                        if (_isProcessing)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // ── Bouton principal de capture ───────────────────────────
+                  AppButton(
+                    label: hasFace
+                        ? 'Mettre à jour mon visage'
+                        : 'Capturer mon visage',
+                    icon: Icons.camera_alt_rounded,
+                    isLoading: _isProcessing,
+                    onPressed: _isProcessing ? null : _handleCaptureFace,
+                  ),
+                  const SizedBox(height: 10),
+
+                  // ── Bouton Supprimer mon visage (si configuré) ─────────────
+                  if (hasFace) ...[
+                    AppButton.destructive(
+                      label: 'Supprimer mon visage',
+                      icon: Icons.delete_outline_rounded,
+                      onPressed: _isProcessing ? null : _handleRemoveFace,
+                    ),
+                    const SizedBox(height: 10),
                   ],
-                ),
-              ),
-              const SizedBox(height: 20),
 
-              // ── Bouton principal ──────────────────────────────────────────
-              AppButton(
-                label: hasFace
-                    ? 'Mettre à jour mon visage'
-                    : 'Capturer mon visage',
-                icon: Icons.camera_alt_outlined,
-                isLoading: _isProcessing,
-                onPressed: _isProcessing || !_cameraActive
-                  ? null
-                  : _handleCaptureFace,
+                  // ── Bouton Retour ─────────────────────────────────────────
+                  AppButton.secondary(
+                    label: 'Retour',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-
-              // ── Bouton supprimer (si visage enregistré) ───────────────────
-              if (hasFace) ...[
-                AppButton.destructive(
-                  label: 'Supprimer mon visage',
-                  icon: Icons.delete_outline_rounded,
-                  onPressed: _isProcessing ? null : _handleRemoveFace,
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // ── Bouton retour ─────────────────────────────────────────────
-              AppButton.secondary(
-                label: 'Retour',
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Construit les 4 coins de visée du scanner
+  /// 4 coins de ciblage Face ID
   List<Widget> _buildCornerCrosshairs(Color color) {
-    const size = 20.0;
-    const thickness = 3.0;
+    const size = 18.0;
+    const thickness = 2.5;
     const offset = 12.0;
 
     Widget corner({

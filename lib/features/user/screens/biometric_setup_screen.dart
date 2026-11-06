@@ -6,6 +6,7 @@ import '../../../widgets/app_app_bar.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/app_card.dart';
 import '../../shared/screens/biometric_auth_screen.dart';
+import 'face_enrollment_screen.dart';
 import 'user_home_screen.dart';
 
 class BiometricSetupScreen extends StatefulWidget {
@@ -166,8 +167,10 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
               // Method 2: Face ID Card
               _buildBiometricCard(
                 icon: Icons.face_rounded,
-                title: 'Reconnaissance faciale',
-                subtitle: 'Reconnaissance 3D',
+                title: 'Reconnaissance faciale (Face ID)',
+                subtitle: context.auth.currentUser?.hasFaceRegistered == true
+                    ? 'Visage configuré'
+                    : 'Visage non configuré',
                 isEnabled: _faceEnabled,
                 isDark: isDark,
                 onChanged: (val) {
@@ -176,6 +179,21 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                   });
                 },
               ),
+              if (_faceEnabled && context.auth.currentUser?.hasFaceRegistered != true) ...[
+                const SizedBox(height: 8),
+                AppButton(
+                  label: 'Configurer mon visage maintenant',
+                  icon: Icons.camera_alt_rounded,
+                  onPressed: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const FaceEnrollmentScreen(),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                ),
+              ],
               const SizedBox(height: 20),
 
               // Informational card matching mockup

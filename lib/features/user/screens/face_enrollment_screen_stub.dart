@@ -5,3 +5,4 @@ import 'package:flutter/widgets.dart';
 Widget buildCameraView() {
   return const SizedBox.shrink();
 }
+
