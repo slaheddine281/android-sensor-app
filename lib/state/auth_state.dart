@@ -676,7 +676,11 @@ class AuthState extends ChangeNotifier {
   }
 
   /// Update password in Supabase for current recovery or authenticated session
-  Future<bool> updatePassword(String newPassword) async {
+  Future<bool> updatePassword(
+    String newPassword, {
+    String? email,
+    String? resetCode,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -684,9 +688,56 @@ class AuthState extends ChangeNotifier {
     final sb = _supabase;
     if (sb != null) {
       try {
+        // 1. Tenter d'extraire la session depuis l'URL si elle n'est pas encore chargée
+        if (sb.auth.currentSession == null && kIsWeb) {
+          try {
+            final url = Uri.base;
+            final urlStr = url.toString();
+            if (urlStr.contains('access_token') ||
+                urlStr.contains('code=') ||
+                urlStr.contains('type=recovery')) {
+              await sb.auth.getSessionFromUrl(url);
+            }
+          } catch (e) {
+            debugPrint('getSessionFromUrl in updatePassword error: $e');
+          }
+        }
+
+        // 2. Si un code OTP ou jeton a été saisi avec l'e-mail, valider avec verifyOTP
+        if (sb.auth.currentSession == null &&
+            email != null &&
+            email.trim().isNotEmpty &&
+            resetCode != null &&
+            resetCode.trim().isNotEmpty) {
+          try {
+            await sb.auth.verifyOTP(
+              email: email.trim().toLowerCase(),
+              token: resetCode.trim(),
+              type: OtpType.recovery,
+            );
+          } catch (e) {
+            debugPrint('verifyOTP error: $e');
+            _errorMessage = 'Code de réinitialisation invalide ou expiré.';
+            _isLoading = false;
+            notifyListeners();
+            return false;
+          }
+        }
+
+        // 3. Vérifier la présence de la session active
+        if (sb.auth.currentSession == null) {
+          _errorMessage =
+              'Session de réinitialisation introuvable. Veuillez cliquer sur le lien reçu dans votre boîte e-mail ou saisir le code de vérification reçu.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        // 4. Mettre à jour le mot de passe de l'utilisateur
         final res = await sb.auth.updateUser(
           UserAttributes(password: newPassword),
         );
+
         if (res.user != null) {
           _isPasswordRecovery = false;
           _isLoading = false;

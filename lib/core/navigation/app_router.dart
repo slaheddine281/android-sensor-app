@@ -65,8 +65,9 @@ class AppRoutes {
             builder: (_) => const ForgotPasswordScreen());
 
       case resetPassword:
+        final email = settings.arguments as String?;
         return MaterialPageRoute(
-            builder: (_) => const ResetPasswordScreen());
+            builder: (_) => ResetPasswordScreen(initialEmail: email));
 
       case biometricSetup:
         return MaterialPageRoute(

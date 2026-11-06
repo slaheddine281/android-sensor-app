@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../../core/constants/supabase_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../state/app_state_provider.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
@@ -45,6 +46,14 @@ class _SplashScreenState extends State<SplashScreen>
     // Vérifier si l'utilisateur arrive depuis un lien de réinitialisation de mot de passe (e-mail Supabase)
     final isRecoveryFromUrl =
         kIsWeb && Uri.base.toString().contains('type=recovery');
+
+    if (isRecoveryFromUrl) {
+      try {
+        await SupabaseConstants.client?.auth.getSessionFromUrl(Uri.base);
+      } catch (e) {
+        debugPrint('SplashScreen getSessionFromUrl error: $e');
+      }
+    }
 
     await Future.delayed(const Duration(milliseconds: 1600));
     if (!mounted) return;

@@ -224,7 +224,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           icon: Icons.lock_reset_rounded,
           onPressed: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ResetPasswordScreen()),
+              MaterialPageRoute(
+                builder: (_) => ResetPasswordScreen(
+                  initialEmail: _emailController.text.trim(),
+                ),
+              ),
             );
           },
         ),
