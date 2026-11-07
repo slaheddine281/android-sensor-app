@@ -15,6 +15,9 @@ class AppTextField extends StatefulWidget {
   final bool readOnly;
   final bool isDarkTheme;
   final int maxLines;
+  final AutovalidateMode? autovalidateMode;
+  final TextInputAction? textInputAction;
+  final void Function(String)? onFieldSubmitted;
 
   const AppTextField({
     super.key,
@@ -31,6 +34,9 @@ class AppTextField extends StatefulWidget {
     this.readOnly = false,
     this.isDarkTheme = false,
     this.maxLines = 1,
+    this.autovalidateMode,
+    this.textInputAction,
+    this.onFieldSubmitted,
   });
 
   @override
@@ -89,8 +95,11 @@ class _AppTextFieldState extends State<AppTextField> {
           initialValue: widget.initialValue,
           obscureText: widget.isPassword && _obscured,
           keyboardType: widget.keyboardType,
+          textInputAction: widget.textInputAction,
+          autovalidateMode: widget.autovalidateMode,
           validator: widget.validator,
           onChanged: widget.onChanged,
+          onFieldSubmitted: widget.onFieldSubmitted,
           readOnly: widget.readOnly,
           maxLines: widget.maxLines,
           style: TextStyle(fontSize: 15, color: textColor),

@@ -136,7 +136,7 @@ class AppRoutes {
 
       case biometricAuth:
         final type = (settings.arguments as BiometricType?) ??
-            BiometricType.fingerprint;
+            BiometricType.face;
         return MaterialPageRoute(
           builder: (_) => BiometricAuthScreen(type: type),
         );

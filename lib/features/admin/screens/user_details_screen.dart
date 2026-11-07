@@ -334,14 +334,10 @@ class _UserDetailsScreenState extends State<UserDetailsScreen>
           ],
           const Divider(),
           _buildDetailRow(
-            label: 'Biométrie',
-            value: user.biometricFingerprintEnabled && user.biometricFaceEnabled
-                ? 'Empreinte (Activée) · Face ID (Activé)'
-                : user.biometricFingerprintEnabled
-                    ? 'Empreinte (Activée)'
-                    : (user.biometricFaceEnabled || user.hasFaceRegistered)
-                        ? 'Face ID (Activé)'
-                        : 'Aucune',
+            label: 'Sécurité Biométrique',
+            value: (user.biometricFaceEnabled || user.hasFaceRegistered)
+                ? 'Face ID (Activé)'
+                : 'Désactivé',
           ),
           if (user.hasFaceRegistered) ...[
             const Divider(),
@@ -375,11 +371,11 @@ class _UserDetailsScreenState extends State<UserDetailsScreen>
           ),
           const SizedBox(height: 12),
           _buildActivityItem(
-            icon: Icons.shield_outlined,
-            title: 'Vérification biométrique',
-            time: user.biometricFingerprintEnabled
-                ? 'Empreinte digitale configurée'
-                : 'Biométrie non activée',
+            icon: Icons.face_retouching_natural_rounded,
+            title: 'Sécurité biométrique Face ID',
+            time: (user.biometricFaceEnabled || user.hasFaceRegistered)
+                ? 'Modèle Face ID 128D configuré'
+                : 'Face ID non activé',
           ),
         ],
       ),

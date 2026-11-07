@@ -1,8 +1,9 @@
 import 'dart:async';
 
 enum BiometricType {
-  fingerprint('Empreinte digitale'),
-  face('Reconnaissance faciale');
+  face('Reconnaissance faciale'),
+  @Deprecated('Empreinte supprimée au profit de Face ID')
+  fingerprint('Empreinte digitale');
 
   final String label;
   const BiometricType(this.label);

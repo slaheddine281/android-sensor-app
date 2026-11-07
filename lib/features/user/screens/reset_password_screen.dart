@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/app_text_field.dart';
+import '../../../widgets/password_strength_indicator.dart';
 import 'login_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -31,6 +32,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _isLoading = false;
   bool _isSuccess = false;
   bool _isSessionReady = false;
+  bool _autoValidate = false;
+  String _currentPassword = '';
+
+  static final RegExp _emailRegex = RegExp(
+    r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$",
+  );
 
   @override
   void initState() {
@@ -39,6 +46,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     _codeController = TextEditingController(text: widget.initialCode ?? '');
     _passwordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
+
+    _passwordController.addListener(() {
+      if (mounted && _currentPassword != _passwordController.text) {
+        setState(() {
+          _currentPassword = _passwordController.text;
+        });
+      }
+    });
 
     // Tenter de restaurer la session depuis l'URL (si l'utilisateur a cliqué sur le lien de son e-mail)
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -85,6 +100,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   Future<void> _handleUpdatePassword() async {
+    setState(() => _autoValidate = true);
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -174,11 +191,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     return Form(
       key: _formKey,
+      autovalidateMode: _autoValidate
+          ? AutovalidateMode.onUserInteraction
+          : AutovalidateMode.disabled,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Illustration / Icône de réinitialisation
+          // Icône de réinitialisation avec halo
           Center(
             child: Container(
               width: 90,
@@ -189,9 +209,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     : AppColors.primarySoft,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppColors.primaryLight.withValues(alpha: 0.3),
+                  color: AppColors.primaryLight.withValues(alpha: 0.35),
                   width: 3,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
               child: const Center(
                 child: Icon(
@@ -208,7 +235,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             'Nouveau mot de passe',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 26,
               fontWeight: FontWeight.w800,
               color: isDark ? Colors.white : AppColors.textPrimary,
               letterSpacing: -0.4,
@@ -216,7 +243,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Saisissez votre nouveau mot de passe ci-dessous pour sécuriser votre compte.',
+            'Saisissez votre nouveau mot de passe ci-dessous pour sécuriser l\'accès à votre compte.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -256,7 +283,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               ),
             )
           else ...[
-            // Si aucune session active n'est détectée depuis l'URL, afficher les champs e-mail et code
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
@@ -265,7 +291,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Row(
@@ -276,7 +304,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Si vous n\'avez pas cliqué sur le lien de l\'e-mail, saisissez votre e-mail et le code à 6 chiffres reçu dans l\'e-mail.',
+                      'Si vous n\'avez pas cliqué sur le lien de l\'e-mail, renseignez votre e-mail et le code à 6 chiffres reçu dans l\'e-mail.',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? Colors.white70 : AppColors.textPrimary,
@@ -296,9 +324,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               prefixIcon: Icons.email_outlined,
+              textInputAction: TextInputAction.next,
               validator: (val) {
-                if (val == null || val.trim().isEmpty || !val.contains('@')) {
-                  return 'Veuillez saisir votre adresse e-mail';
+                final trimmed = val?.trim() ?? '';
+                if (trimmed.isEmpty) {
+                  return 'Veuillez renseigner votre e-mail';
+                }
+                if (!_emailRegex.hasMatch(trimmed)) {
+                  return 'Format d\'e-mail invalide';
                 }
                 return null;
               },
@@ -311,6 +344,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               hint: 'Ex: 123456 ou code du mail',
               controller: _codeController,
               prefixIcon: Icons.pin_outlined,
+              textInputAction: TextInputAction.next,
               validator: (val) {
                 if (val == null || val.trim().isEmpty) {
                   return 'Veuillez saisir le code reçu par e-mail';
@@ -321,30 +355,42 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           ],
           const SizedBox(height: 16),
 
-          // Champ Nouveau Mot de passe
+          // Champ Nouveau Mot de passe avec contrôle et jauge de force
           AppTextField(
             label: 'Nouveau mot de passe',
-            hint: 'Au moins 6 caractères',
+            hint: '8 caractères minimum avec majuscules et chiffres',
             controller: _passwordController,
             isPassword: true,
             prefixIcon: Icons.lock_outline_rounded,
+            textInputAction: TextInputAction.next,
             validator: (val) {
-              if (val == null || val.trim().length < 6) {
-                return 'Le mot de passe doit contenir au moins 6 caractères';
+              if (val == null || val.trim().length < 8) {
+                return 'Le mot de passe doit contenir au moins 8 caractères';
               }
               return null;
             },
           ),
-          const SizedBox(height: 16),
 
-          // Champ Confirmer Mot de passe
+          // Indicateur de force interactif
+          PasswordStrengthIndicator(
+            password: _currentPassword,
+            showCriteria: true,
+          ),
+          const SizedBox(height: 14),
+
+          // Champ Confirmer Mot de passe avec validation en temps réel
           AppTextField(
-            label: 'Confirmer le mot de passe',
+            label: 'Confirmer le nouveau mot de passe',
             hint: 'Répétez le mot de passe',
             controller: _confirmPasswordController,
             isPassword: true,
             prefixIcon: Icons.lock_reset_rounded,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _handleUpdatePassword(),
             validator: (val) {
+              if (val == null || val.isEmpty) {
+                return 'Veuillez confirmer votre mot de passe';
+              }
               if (val != _passwordController.text) {
                 return 'Les deux mots de passe ne correspondent pas';
               }
@@ -385,13 +431,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       children: [
         Center(
           child: Container(
-            width: 88,
-            height: 88,
+            width: 90,
+            height: 90,
             decoration: BoxDecoration(
               color: isDark
                   ? const Color(0xFF064E3B).withValues(alpha: 0.4)
                   : AppColors.secondarySoft,
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.secondary.withValues(alpha: 0.35),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
             child: const Center(
               child: Icon(
@@ -402,19 +455,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
         Text(
           'Mot de passe mis à jour !',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: FontWeight.w800,
             color: isDark ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 10),
         Text(
-          'Votre mot de passe a été modifié avec succès. Vous pouvez maintenant vous connecter avec vos nouveaux identifiants.',
+          'Votre mot de passe a été modifié avec succès. Vous pouvez maintenant vous connecter en toute sécurité.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -422,7 +475,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             height: 1.4,
           ),
         ),
-        const SizedBox(height: 26),
+        const SizedBox(height: 28),
         AppButton(
           label: 'Se connecter maintenant',
           icon: Icons.login_rounded,

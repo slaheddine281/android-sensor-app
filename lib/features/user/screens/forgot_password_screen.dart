@@ -17,6 +17,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
   bool _isSubmitted = false;
+  bool _autoValidate = false;
+  String? _errorText;
+
+  static final RegExp _emailRegex = RegExp(
+    r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$",
+  );
 
   @override
   void dispose() {
@@ -25,20 +31,33 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _handleSendResetLink() async {
+    setState(() => _autoValidate = true);
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
+      _errorText = null;
     });
 
-    await context.auth.requestPasswordReset(_emailController.text);
+    final success = await context.auth.requestPasswordReset(_emailController.text.trim());
 
     if (!mounted) return;
 
     setState(() {
       _isLoading = false;
-      _isSubmitted = true;
     });
+
+    if (success) {
+      setState(() {
+        _isSubmitted = true;
+      });
+    } else {
+      setState(() {
+        _errorText = context.auth.errorMessage ??
+            'Impossible d\'envoyer le lien de réinitialisation. Vérifiez l\'adresse e-mail.';
+      });
+    }
   }
 
   @override
@@ -62,9 +81,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: _isSubmitted
-                ? _buildSuccessView(context, isDark)
-                : _buildFormView(context, isDark),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: _isSubmitted
+                  ? _buildSuccessView(context, isDark)
+                  : _buildFormView(context, isDark),
+            ),
           ),
         ),
       ),
@@ -74,29 +96,39 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget _buildFormView(BuildContext context, bool isDark) {
     return Form(
       key: _formKey,
+      autovalidateMode: _autoValidate
+          ? AutovalidateMode.onUserInteraction
+          : AutovalidateMode.disabled,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Illustration matching mockup Screen 04
+          // Illustration avec halo
           Center(
             child: Container(
-              width: 110,
-              height: 110,
+              width: 100,
+              height: 100,
               decoration: BoxDecoration(
                 color: isDark
                     ? const Color(0xFF1E3A8A).withValues(alpha: 0.3)
                     : AppColors.primarySoft,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppColors.primaryLight.withValues(alpha: 0.25),
+                  color: AppColors.primaryLight.withValues(alpha: 0.35),
                   width: 3,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
               child: const Center(
                 child: Icon(
                   Icons.mark_email_read_rounded,
-                  size: 52,
+                  size: 48,
                   color: AppColors.primaryLight,
                 ),
               ),
@@ -108,7 +140,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             'Mot de passe oublié ?',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 24,
+              fontSize: 26,
               fontWeight: FontWeight.w800,
               color: isDark ? Colors.white : AppColors.textPrimary,
               letterSpacing: -0.4,
@@ -116,7 +148,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            'Entrez votre e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe.',
+            'Entrez votre adresse e-mail associée à votre compte StepQuest pour recevoir un lien de réinitialisation sécurisé.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -124,18 +156,49 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
 
-          // Email Field
+          // Bannière d'erreur si échec
+          if (_errorText != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.errorSoft,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _errorText!,
+                      style: const TextStyle(color: AppColors.error, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
+
+          // Email Field avec contrôle de saisie RFC
           AppTextField(
-            label: 'E-mail',
+            label: 'Adresse e-mail',
             hint: 'votre@email.com',
             controller: _emailController,
             prefixIcon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _handleSendResetLink(),
             validator: (val) {
-              if (val == null || val.trim().isEmpty || !val.contains('@')) {
-                return 'Veuillez saisir une adresse email valide';
+              final trimmed = val?.trim() ?? '';
+              if (trimmed.isEmpty) {
+                return 'Veuillez saisir votre adresse e-mail';
+              }
+              if (!_emailRegex.hasMatch(trimmed)) {
+                return 'Format d\'e-mail invalide (ex: nom@domaine.com)';
               }
               return null;
             },
@@ -144,7 +207,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
           // Submit Button
           AppButton(
-            label: 'Envoyer le lien',
+            label: 'Envoyer le lien de réinitialisation',
+            icon: Icons.send_rounded,
             isLoading: _isLoading,
             onPressed: _handleSendResetLink,
           ),
@@ -188,6 +252,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ? const Color(0xFF064E3B).withValues(alpha: 0.4)
                   : AppColors.secondarySoft,
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.secondary.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
             child: const Center(
               child: Icon(
@@ -241,4 +312,3 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 }
-

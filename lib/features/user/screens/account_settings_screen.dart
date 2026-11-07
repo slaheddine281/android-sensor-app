@@ -249,14 +249,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       );
     }
 
-    final biometricSummary = user.biometricFingerprintEnabled &&
-            user.biometricFaceEnabled
-        ? 'Empreinte · Visage'
-        : user.biometricFingerprintEnabled
-            ? 'Empreinte'
-            : user.biometricFaceEnabled
-                ? 'Visage'
-                : 'Désactivé';
+    final faceIdSummary = (user.biometricFaceEnabled || user.hasFaceRegistered)
+        ? 'Face ID activé'
+        : 'Désactivé';
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
@@ -407,7 +402,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 padding: EdgeInsets.zero,
                 child: Column(
                   children: [
-                    // Biometrics
+                    // Face ID
                     ListTile(
                       leading: Container(
                         padding: const EdgeInsets.all(8),
@@ -417,18 +412,18 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                               : AppColors.secondarySoft,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.fingerprint_rounded,
+                        child: const Icon(Icons.face_retouching_natural_rounded,
                             color: AppColors.secondary, size: 20),
                       ),
                       title: Text(
-                        'Biométrie',
+                        'Reconnaissance faciale Face ID',
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: isDark ? Colors.white : AppColors.textPrimary),
                       ),
                       subtitle: Text(
-                        biometricSummary,
+                        faceIdSummary,
                         style: TextStyle(
                             fontSize: 12,
                             color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),

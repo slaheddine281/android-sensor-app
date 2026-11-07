@@ -184,16 +184,18 @@ class BiometricQuickButton extends StatelessWidget {
                     : AppColors.primarySoft,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.fingerprint_rounded,
-                  size: 20, color: AppColors.primaryLight),
+              child: Icon(icon, size: 20, color: AppColors.primary),
             ),
             const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white : AppColors.textPrimary,
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
+                ),
               ),
             ),
           ],

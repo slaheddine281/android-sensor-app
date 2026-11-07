@@ -22,7 +22,6 @@ class BiometricSetupScreen extends StatefulWidget {
 }
 
 class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
-  bool _fingerprintEnabled = true;
   bool _faceEnabled = true;
   bool _isSaving = false;
   bool _isInitialized = false;
@@ -33,7 +32,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     if (!_isInitialized) {
       final user = context.auth.currentUser;
       if (user != null) {
-        _fingerprintEnabled = user.biometricFingerprintEnabled;
         _faceEnabled = user.biometricFaceEnabled;
       }
       _isInitialized = true;
@@ -41,14 +39,10 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   }
 
   Future<void> _handleTestBiometrics() async {
-    final type = _fingerprintEnabled
-        ? BiometricType.fingerprint
-        : BiometricType.face;
-
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => BiometricAuthScreen(
-          type: type,
+        builder: (_) => const BiometricAuthScreen(
+          type: BiometricType.face,
           isSimulationTestOnly: true,
         ),
       ),
@@ -63,7 +57,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     final currentUser = context.auth.currentUser;
     if (currentUser != null) {
       final updated = currentUser.copyWith(
-        biometricFingerprintEnabled: _fingerprintEnabled,
+        biometricFingerprintEnabled: false,
         biometricFaceEnabled: _faceEnabled,
       );
 
@@ -78,7 +72,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Préférences biométriques enregistrées.'),
+        content: Text('Préférences Face ID enregistrées avec succès.'),
         backgroundColor: AppColors.secondary,
         behavior: SnackBarBehavior.floating,
       ),
@@ -100,10 +94,13 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentUser = context.auth.currentUser;
+    final hasFaceRegistered = currentUser?.hasFaceRegistered == true;
+
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
       appBar: AppAppBar(
-        title: 'Authentification biométrique',
+        title: 'Sécurité Biométrique Face ID',
         showBackButton: !widget.isInitialOnboarding,
         actions: [
           if (widget.isInitialOnboarding)
@@ -131,7 +128,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
             children: [
               const SizedBox(height: 8),
               Text(
-                'Authentification biométrique',
+                'Reconnaissance Faciale Face ID',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -141,67 +138,129 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Choisissez vos méthodes d\'authentification biométrique.',
+                'Protégez votre compte avec l\'authentification faciale haute précision par intelligence artificielle.',
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                  height: 1.4,
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Method 1: Fingerprint Card
-              _buildBiometricCard(
-                icon: Icons.fingerprint_rounded,
-                title: 'Empreinte digitale',
-                subtitle: 'Sécurisé et rapide',
-                isEnabled: _fingerprintEnabled,
-                isDark: isDark,
-                onChanged: (val) {
-                  setState(() {
-                    _fingerprintEnabled = val;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
+              // Carte Face ID Principale
+              AppCard(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF1E3A8A).withValues(alpha: 0.3)
+                                : AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.face_retouching_natural_rounded,
+                            color: AppColors.primaryLight,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Face ID IA',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: _faceEnabled && hasFaceRegistered
+                                          ? AppColors.secondary
+                                          : _faceEnabled
+                                              ? const Color(0xFFF59E0B)
+                                              : AppColors.textMuted,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _faceEnabled
+                                        ? (hasFaceRegistered
+                                            ? 'Modèle 128D configuré'
+                                            : 'Visage non configuré')
+                                        : 'Désactivé',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: _faceEnabled && hasFaceRegistered
+                                          ? AppColors.secondary
+                                          : _faceEnabled
+                                              ? const Color(0xFFF59E0B)
+                                              : AppColors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _faceEnabled,
+                          activeThumbColor: AppColors.primary,
+                          activeTrackColor: AppColors.primarySoft,
+                          onChanged: (val) {
+                            setState(() {
+                              _faceEnabled = val;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 12),
 
-              // Method 2: Face ID Card
-              _buildBiometricCard(
-                icon: Icons.face_rounded,
-                title: 'Reconnaissance faciale (Face ID)',
-                subtitle: context.auth.currentUser?.hasFaceRegistered == true
-                    ? 'Visage configuré'
-                    : 'Visage non configuré',
-                isEnabled: _faceEnabled,
-                isDark: isDark,
-                onChanged: (val) {
-                  setState(() {
-                    _faceEnabled = val;
-                  });
-                },
-              ),
-              if (_faceEnabled && context.auth.currentUser?.hasFaceRegistered != true) ...[
-                const SizedBox(height: 8),
-                AppButton(
-                  label: 'Configurer mon visage maintenant',
-                  icon: Icons.camera_alt_rounded,
-                  onPressed: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const FaceEnrollmentScreen(),
-                      ),
-                    );
-                    if (mounted) setState(() {});
-                  },
+                    // Bouton Enrôlement / Scanner Visage
+                    AppButton(
+                      label: hasFaceRegistered
+                          ? 'Recalibrer / Mettre à jour mon visage'
+                          : 'Scanner et enregistrer mon visage',
+                      icon: Icons.camera_enhance_rounded,
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const FaceEnrollmentScreen(),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                  ],
                 ),
-              ],
+              ),
               const SizedBox(height: 20),
 
-              // Informational card matching mockup
+              // Carte d'information explicative
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? const Color(0xFF1E3A8A).withValues(alpha: 0.3)
+                      ? const Color(0xFF1E3A8A).withValues(alpha: 0.25)
                       : AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
@@ -212,14 +271,14 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
-                      Icons.info_outline_rounded,
+                      Icons.security_rounded,
                       color: AppColors.primaryLight,
-                      size: 20,
+                      size: 22,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Vous pouvez activer la biométrie pour une connexion plus rapide et plus sécurisée.',
+                        'StepQuest utilise un réseau neuronal pour générer une empreinte vectorielle 128D stockée de manière sécurisée. Vos données faciales ne sont jamais partagées.',
                         style: TextStyle(
                           fontSize: 13,
                           color: isDark ? Colors.white : AppColors.textPrimary,
@@ -232,14 +291,15 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Test Button matching mockup Screen 05
+              // Tester Face ID
               AppButton(
-                label: 'Tester la biométrie',
+                label: 'Tester le scanner Face ID',
+                icon: Icons.face_rounded,
                 onPressed: _handleTestBiometrics,
               ),
               const SizedBox(height: 12),
 
-              // Save preferences button
+              // Sauvegarder
               AppButton.secondary(
                 label: 'Enregistrer les préférences',
                 isLoading: _isSaving,
@@ -249,82 +309,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildBiometricCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isEnabled,
-    required bool isDark,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF1E3A8A).withValues(alpha: 0.3)
-                  : AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: AppColors.primaryLight, size: 26),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: isEnabled
-                            ? AppColors.secondary
-                            : AppColors.textMuted,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      isEnabled ? 'Activé' : 'Désactivé',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: isEnabled
-                            ? AppColors.secondary
-                            : AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: isEnabled,
-            activeThumbColor: AppColors.primary,
-            activeTrackColor: AppColors.primarySoft,
-            onChanged: onChanged,
-          ),
-        ],
       ),
     );
   }

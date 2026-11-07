@@ -402,10 +402,7 @@ class AuthState extends ChangeNotifier {
 
     if (user == null) {
       final candidates = userState.allUsers.where(
-        (u) =>
-            type == BiometricType.fingerprint
-                ? u.biometricFingerprintEnabled
-                : u.biometricFaceEnabled,
+        (u) => u.biometricFaceEnabled || u.hasFaceRegistered,
       );
       if (candidates.isNotEmpty) {
         user = candidates.first;
@@ -438,7 +435,7 @@ class AuthState extends ChangeNotifier {
     notificationState.addNotification(
       title: 'Connexion biométrique',
       message:
-          'Connexion via ${type.label.toLowerCase()} réussie (${updated.fullName}).',
+          'Connexion via reconnaissance faciale Face ID réussie (${updated.fullName}).',
       type: NotificationType.loginDetected,
       relatedUserId: updated.id,
     );

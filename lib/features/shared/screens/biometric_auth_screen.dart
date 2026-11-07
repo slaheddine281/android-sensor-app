@@ -17,7 +17,7 @@ class BiometricAuthScreen extends StatefulWidget {
 
   const BiometricAuthScreen({
     super.key,
-    this.type = BiometricType.fingerprint,
+    this.type = BiometricType.face,
     this.targetEmail,
     this.isSimulationTestOnly = false,
   });
@@ -50,27 +50,21 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
 
-    if (widget.type == BiometricType.face) {
-      _statusMessage = 'Démarrage de la reconnaissance faciale...';
-      // Démarrer la caméra automatiquement après le premier frame
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _startCameraAndPrepare();
-      });
-    } else {
-      _statusMessage = 'Placez votre doigt sur le capteur d\'empreinte.';
-    }
+    _statusMessage = 'Démarrage de la reconnaissance faciale Face ID...';
+    // Démarrer la caméra automatiquement après le premier frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startCameraAndPrepare();
+    });
   }
 
   @override
   void dispose() {
     _autoScanTimer?.cancel();
     _animController.dispose();
-    if (widget.type == BiometricType.face) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // ignore: use_build_context_synchronously
-        context.faceRecognition.stopCamera();
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // ignore: use_build_context_synchronously
+      context.faceRecognition.stopCamera();
+    });
     super.dispose();
   }
 
@@ -188,9 +182,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     setState(() {
       _isVerifying = true;
       _isSuccess = null;
-      _statusMessage = widget.type == BiometricType.fingerprint
-          ? 'Lecture de l\'empreinte...'
-          : 'Analyse biométrique faciale...';
+      _statusMessage = 'Analyse biométrique faciale Face ID...';
     });
 
     await Future.delayed(const Duration(milliseconds: 1000));
@@ -245,21 +237,17 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ── Visual Scanner (Caméra ou Empreinte) ───────────────────
+                  // ── Visual Scanner Face ID Caméra ─────────────────────────
                   Center(
-                    child: widget.type == BiometricType.face
-                        ? _buildFaceCameraWidget(accentColor)
-                        : _buildFingerprintWidget(accentColor),
+                    child: _buildFaceCameraWidget(accentColor),
                   ),
                   const SizedBox(height: 24),
 
                   // ── Titre ──────────────────────────────────────────────────
-                  Text(
-                    widget.type == BiometricType.face
-                        ? 'Reconnaissance Faciale'
-                        : 'Authentification biométrique',
+                  const Text(
+                    'Reconnaissance Faciale Face ID',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
@@ -535,47 +523,6 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
             ),
         ],
       ),
-    );
-  }
-
-  /// Icône d'empreinte digitale animée
-  Widget _buildFingerprintWidget(Color glowColor) {
-    return AnimatedBuilder(
-      animation: _scanAnimation,
-      builder: (context, _) {
-        return Container(
-          width: 140,
-          height: 140,
-          decoration: BoxDecoration(
-            color: glowColor.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: glowColor.withValues(alpha: 0.5),
-              width: 2.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: glowColor.withValues(alpha: 0.35),
-                blurRadius: 32,
-                spreadRadius: 4,
-              ),
-            ],
-          ),
-          child: Center(
-            child: _isSuccess == true
-                ? const Icon(Icons.check_circle_rounded,
-                    size: 64, color: AppColors.secondary)
-                : _isSuccess == false
-                    ? const Icon(Icons.error_outline_rounded,
-                        size: 64, color: AppColors.error)
-                    : Icon(
-                        Icons.fingerprint_rounded,
-                        size: 70,
-                        color: glowColor,
-                      ),
-          ),
-        );
-      },
     );
   }
 

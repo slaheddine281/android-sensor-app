@@ -272,11 +272,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         _buildInfoRow(
                           icon: Icons.shield_outlined,
                           label: 'Sécurité Biométrique',
-                          value: user.hasFaceRegistered
+                          value: (user.biometricFaceEnabled || user.hasFaceRegistered)
                               ? 'Face ID configuré'
-                              : (user.biometricFingerprintEnabled
-                                  ? 'Empreinte active'
-                                  : 'Désactivée'),
+                              : 'Désactivé',
                           isDark: isDark,
                         ),
                       ],
