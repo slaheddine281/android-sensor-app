@@ -23,6 +23,7 @@ enum BiometricAuthResult {
   canceled,
   notEnrolled,
   unavailable,
+  lockedOut,
 }
 
 /// Service biométrique unifié.
@@ -176,10 +177,9 @@ class MockBiometricService {
 
       final ok = await _localAuth.authenticate(
         localizedReason: reason,
-        options: AuthenticationOptions(
-          // Windows Hello ne sait pas fonctionner en mode « biométrie seule »
-          // (le plugin lève UnsupportedError). Ailleurs on l'exige.
-          biometricOnly: defaultTargetPlatform != TargetPlatform.windows,
+        options: const AuthenticationOptions(
+          // Permet au système Android d'offrir le code de secours en cas de verrouillage
+          biometricOnly: false,
           stickyAuth: true,
           useErrorDialogs: true,
         ),
@@ -194,7 +194,7 @@ class MockBiometricService {
           return BiometricAuthResult.notEnrolled;
         case auth_error.lockedOut:
         case auth_error.permanentlyLockedOut:
-          return BiometricAuthResult.failed;
+          return BiometricAuthResult.lockedOut;
         case auth_error.otherOperatingSystem:
         case auth_error.biometricOnlyNotSupported:
           return BiometricAuthResult.unavailable;
@@ -213,6 +213,8 @@ class MockBiometricService {
         return 'Authentification biométrique réussie.';
       case BiometricAuthResult.failed:
         return 'Biométrie non reconnue. Veuillez réessayer.';
+      case BiometricAuthResult.lockedOut:
+        return 'Capteur temporairement verrouillé par votre téléphone suite à trop de tentatives. Patientez 30 secondes ou déverrouillez l\'écran de votre téléphone avec votre code/schéma.';
       case BiometricAuthResult.canceled:
         return 'Authentification biométrique annulée.';
       case BiometricAuthResult.notEnrolled:

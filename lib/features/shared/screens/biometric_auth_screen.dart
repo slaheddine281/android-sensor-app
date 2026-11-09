@@ -154,10 +154,6 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
   }
 
   /// Retourne l'e-mail du compte à connecter, ou `null` en affichant la raison.
-  ///
-  /// Sur mobile, le Face ID natif est lié au compte enrôlé sur CET appareil.
-  /// Sans cette vérification, il suffirait de saisir l'e-mail d'autrui puis de
-  /// valider son propre doigt pour ouvrir le compte d'un autre utilisateur.
   Future<String?> _resolveNativeAccountEmail() async {
     final sessionUser = context.auth.currentUser;
     final typedEmail = (widget.targetEmail ?? '').trim();
@@ -181,37 +177,66 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     final boundEmail = await _biometricService?.boundAccountEmail();
     if (!mounted) return null;
 
-    if (boundEmail == null || boundEmail.isEmpty) {
-      setState(() {
-        _isSuccess = false;
-        _statusMessage = widget.type == BiometricType.fingerprint
-            ? 'L\'empreinte digitale n\'est pas activée sur cet appareil. Connectez-vous avec votre mot de passe, puis activez l\'empreinte dans les paramètres.'
-            : 'Face ID n\'est pas activé sur cet appareil. Connectez-vous avec votre mot de passe, puis activez Face ID dans les paramètres.';
-      });
-      return null;
+    if (boundEmail != null && boundEmail.isNotEmpty) {
+      if (typedEmail.isNotEmpty && typedEmail.toLowerCase() != boundEmail) {
+        setState(() {
+          _isSuccess = false;
+          _statusMessage = widget.type == BiometricType.fingerprint
+              ? 'Cette empreinte est associée à un autre compte sur cet appareil ($boundEmail).'
+              : 'Ce Face ID est associé à un autre compte sur cet appareil ($boundEmail).';
+        });
+        return null;
+      }
+      return boundEmail;
     }
 
-    if (typedEmail.isNotEmpty && typedEmail.toLowerCase() != boundEmail) {
-      setState(() {
-        _isSuccess = false;
-        _statusMessage = widget.type == BiometricType.fingerprint
-            ? 'Cette empreinte est associée à un autre compte sur cet appareil.'
-            : 'Ce Face ID est associé à un autre compte sur cet appareil.';
-      });
-      return null;
+    // Aucun compte n'est encore lié localement sur cet appareil :
+    // Si un e-mail a été saisi, on vérifie si le compte a activé la biométrie
+    if (typedEmail.isNotEmpty) {
+      final user = context.users.findByEmail(typedEmail);
+      final hasBio = user != null &&
+          (widget.type == BiometricType.fingerprint
+              ? user.biometricFingerprintEnabled
+              : (user.biometricFaceEnabled || user.hasFaceRegistered));
+      if (user == null || !hasBio) {
+        setState(() {
+          _isSuccess = false;
+          _statusMessage = widget.type == BiometricType.fingerprint
+              ? 'L\'empreinte digitale n\'est pas encore activée pour ce compte. Connectez-vous avec votre mot de passe puis activez-la dans votre profil.'
+              : 'Face ID n\'est pas configuré pour ce compte. Connectez-vous avec votre mot de passe puis configurez Face ID.';
+        });
+        return null;
+      }
+      return typedEmail;
     }
 
-    return boundEmail;
+    // Aucun e-mail saisi : si un seul utilisateur est éligible, on le propose
+    final candidates = context.users.allUsers.where((u) =>
+        widget.type == BiometricType.fingerprint
+            ? u.biometricFingerprintEnabled
+            : (u.biometricFaceEnabled || u.hasFaceRegistered)).toList();
+    if (candidates.length == 1) {
+      return candidates.first.email;
+    }
+
+    setState(() {
+      _isSuccess = false;
+      _statusMessage = widget.type == BiometricType.fingerprint
+          ? 'Saisissez votre e-mail ou activez l\'empreinte dans votre profil après connexion.'
+          : 'Saisissez votre e-mail ou configurez Face ID dans votre profil après connexion.';
+    });
+    return null;
   }
 
   Future<void> _completeLogin({String? targetEmail}) async {
     if (!widget.isSimulationTestOnly) {
+      final emailToUse = (targetEmail ?? widget.targetEmail)?.trim();
       final loggedIn = await context.auth.loginWithBiometrics(
         type: widget.type,
         userState: context.users,
         notificationState: context.notifications,
         biometricService: context.biometrics,
-        targetEmail: (targetEmail ?? widget.targetEmail)?.trim(),
+        targetEmail: emailToUse,
         // La biométrie a déjà été validée juste avant.
         biometricVerified: true,
       );
@@ -228,6 +253,11 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                   : 'Connexion Face ID impossible. Utilisez votre mot de passe.');
         });
         return;
+      }
+
+      // Mémorise la liaison sur cet appareil pour les prochaines connexions
+      if (emailToUse != null && emailToUse.isNotEmpty) {
+        await _biometricService?.bindAccountToDevice(emailToUse);
       }
     }
 

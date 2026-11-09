@@ -26,6 +26,7 @@ class _FingerprintEnrollmentScreenState extends State<FingerprintEnrollmentScree
   MockBiometricService? _biometricService;
   bool _isProcessing = false;
   bool? _isSuccess;
+  bool _isLockedOut = false;
   String _statusMessage =
       'Appuyez sur "Enregistrer mon empreinte" puis posez votre doigt sur le capteur.';
 
@@ -68,6 +69,7 @@ class _FingerprintEnrollmentScreenState extends State<FingerprintEnrollmentScree
     setState(() {
       _isProcessing = true;
       _isSuccess = null;
+      _isLockedOut = false;
       _statusMessage =
           'Posez votre doigt sur le capteur d\'empreinte du téléphone...';
     });
@@ -81,9 +83,11 @@ class _FingerprintEnrollmentScreenState extends State<FingerprintEnrollmentScree
     if (!mounted) return;
 
     if (result != BiometricAuthResult.success) {
+      final locked = result == BiometricAuthResult.lockedOut;
       setState(() {
         _isProcessing = false;
         _isSuccess = false;
+        _isLockedOut = locked;
         _statusMessage = MockBiometricService.messageFor(result);
       });
 
@@ -424,6 +428,52 @@ class _FingerprintEnrollmentScreenState extends State<FingerprintEnrollmentScree
                       ],
                     ),
                   ),
+
+                  // ── Bannière d'aide en cas de verrouillage Android ─────────
+                  if (_isLockedOut) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColors.error.withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Row(
+                            children: [
+                              Icon(Icons.lock_clock_rounded,
+                                  color: AppColors.error, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Sécurité Android : Capteur bloqué 30s',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.error,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Votre téléphone a détecté trop d\'essais consécutifs. Pour débloquer immédiatement :\n'
+                            '1. Verrouillez l\'écran de votre téléphone avec le bouton d\'alimentation.\n'
+                            '2. Déverrouillez-le avec votre code PIN ou schéma habituel.\n'
+                            '3. Revenez dans l\'application et relancez l\'enregistrement.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF991B1B),
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   // ── Bouton principal d'enrôlement ─────────────────────────
@@ -461,3 +511,4 @@ class _FingerprintEnrollmentScreenState extends State<FingerprintEnrollmentScree
     );
   }
 }
+
