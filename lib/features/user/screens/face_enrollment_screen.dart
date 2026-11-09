@@ -1,6 +1,11 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:async';
+
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../services/face_recognition_service.dart';
+import '../../../services/mock_biometric_service.dart';
 import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_app_bar.dart';
 import '../../../widgets/app_button.dart';
@@ -22,10 +27,23 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   late AnimationController _scanController;
   late Animation<double> _scanAnimation;
 
+  FaceRecognitionService? _faceService;
+  MockBiometricService? _biometricService;
+
   bool _isProcessing = false;
   bool _cameraActive = false;
   bool _modelLoading = false;
   String _statusMessage = 'Démarrage de la caméra...';
+
+  /// Sur téléphone, on utilise la biométrie native (Face ID / empreinte).
+  /// Sur le Web, on conserve l'enrôlement facial IA par webcam.
+  bool get _usesNativeBiometrics {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows;
+  }
 
   @override
   void initState() {
@@ -40,14 +58,26 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       CurvedAnimation(parent: _scanController, curve: Curves.easeInOut),
     );
 
-    // Initialiser la caméra après le premier rendu
+    _statusMessage = _usesNativeBiometrics
+        ? 'Appuyez sur "Activer Face ID" puis validez avec votre visage ou votre empreinte.'
+        : 'Démarrage de la caméra...';
+
+    // Initialiser la caméra après le premier rendu (Web uniquement)
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_usesNativeBiometrics) return;
       _initCamera();
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _faceService = context.faceRecognition;
+    _biometricService = context.biometrics;
+  }
+
   Future<void> _initCamera() async {
-    if (!mounted) return;
+    if (!mounted || _usesNativeBiometrics) return;
 
     setState(() {
       _isProcessing = false;
@@ -55,8 +85,17 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       _statusMessage = 'Ouverture de la caméra...';
     });
 
-    final faceService = context.faceRecognition;
-    final camOk = await faceService.startCamera();
+    final faceService = _faceService ?? context.faceRecognition;
+    bool camOk;
+    try {
+      camOk = await faceService
+          .startCamera()
+          .timeout(const Duration(seconds: 12));
+    } on TimeoutException {
+      camOk = false;
+    } catch (_) {
+      camOk = false;
+    }
 
     if (!mounted) return;
 
@@ -67,10 +106,15 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
           : 'Accès caméra en attente. Vérifiez que votre navigateur autorise la webcam.';
     });
 
-    // Préchargement des modèles d'analyse faciale
+    // Préchargement des modèles d'analyse faciale (avec expiration)
     if (!faceService.modelsLoaded) {
       setState(() => _modelLoading = true);
-      faceService.initializeModels().then((_) {
+      faceService
+          .initializeModels()
+          .timeout(const Duration(seconds: 15), onTimeout: () => false)
+          .then((_) {
+        if (mounted) setState(() => _modelLoading = false);
+      }).catchError((_) {
         if (mounted) setState(() => _modelLoading = false);
       });
     }
@@ -79,26 +123,39 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   @override
   void dispose() {
     _scanController.dispose();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // ignore: use_build_context_synchronously
-      context.faceRecognition.stopCamera();
-    });
+    // On utilise la référence mémorisée : `context` n'est plus utilisable ici.
+    _faceService?.stopCamera();
     super.dispose();
   }
 
   Future<void> _handleCaptureFace() async {
     if (_isProcessing) return;
 
+    // ── Mode mobile : biométrie native du téléphone ─────────────────────────
+    if (_usesNativeBiometrics) {
+      await _enrollWithDeviceBiometrics();
+      return;
+    }
+
     setState(() {
       _isProcessing = true;
       _statusMessage = 'Extraction des 128 points biométriques en cours...';
     });
 
-    final faceService = context.faceRecognition;
+    final faceService = _faceService ?? context.faceRecognition;
 
     // Si la caméra n'était pas active, essayer de la réactiver
     if (!_cameraActive) {
-      final camOk = await faceService.startCamera();
+      bool camOk;
+      try {
+        camOk = await faceService
+            .startCamera()
+            .timeout(const Duration(seconds: 12));
+      } on TimeoutException {
+        camOk = false;
+      } catch (_) {
+        camOk = false;
+      }
       if (!camOk) {
         if (!mounted) return;
         setState(() {
@@ -107,10 +164,30 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         });
         return;
       }
-      setState(() => _cameraActive = true);
+      if (mounted) setState(() => _cameraActive = true);
     }
 
-    final result = await faceService.scanFace();
+    FaceDetectionResult result;
+    try {
+      result = await faceService
+          .scanFace()
+          .timeout(const Duration(seconds: 20));
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+        _statusMessage =
+            'Le scan a pris trop de temps. Replacez votre visage et réessayez.';
+      });
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = 'Erreur pendant le scan : $e';
+      });
+      return;
+    }
 
     if (!mounted) return;
 
@@ -164,13 +241,81 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     }
   }
 
+  /// Enrôlement sur téléphone : on s'appuie sur le Face ID / capteur
+  /// biométrique natif. Aucun vecteur 128D n'est calculé côté mobile.
+  Future<void> _enrollWithDeviceBiometrics() async {
+    setState(() {
+      _isProcessing = true;
+      _statusMessage = 'Validation de votre identité par le capteur biométrique...';
+    });
+
+    final result = await _biometricService?.authenticate(
+          type: BiometricType.face,
+          reason: 'Activez Face ID pour sécuriser votre compte StepQuest',
+        ) ??
+        BiometricAuthResult.unavailable;
+
+    if (!mounted) return;
+
+    if (result != BiometricAuthResult.success) {
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = MockBiometricService.messageFor(result);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(MockBiometricService.messageFor(result)),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final currentUser = context.auth.currentUser;
+    if (currentUser != null) {
+      final updated = currentUser.copyWith(
+        faceEmbedding: MockBiometricService.deviceBiometricMarker,
+        biometricFaceEnabled: true,
+      );
+
+      await context.auth.updateCurrentProfile(
+        updatedUser: updated,
+        userState: context.users,
+        notificationState: context.notifications,
+      );
+
+      // Lie ce Face ID natif à CE compte sur CET appareil.
+      await _biometricService?.bindAccountToDevice(currentUser.email);
+      await _biometricService?.cacheBoundProfile(updated);
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isProcessing = false;
+      _statusMessage = '✓ Face ID activé avec succès sur cet appareil !';
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Face ID activé avec succès sur cet appareil !'),
+        backgroundColor: AppColors.secondary,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _handleRemoveFace() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Supprimer mon visage'),
-        content: const Text(
-          'Voulez-vous supprimer les données biométriques de votre visage ? Vous ne pourrez plus vous connecter avec Face ID.',
+        content: Text(
+          _usesNativeBiometrics
+              ? 'Voulez-vous désactiver Face ID sur cet appareil ? Vous devrez vous connecter avec votre mot de passe.'
+              : 'Voulez-vous supprimer les données biométriques de votre visage ? Vous ne pourrez plus vous connecter avec Face ID.',
         ),
         actions: [
           TextButton(
@@ -201,17 +346,23 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
         userState: context.users,
         notificationState: context.notifications,
       );
+
+      await _biometricService?.clearDeviceBinding();
     }
 
     if (!mounted) return;
 
     setState(() {
-      _statusMessage = 'Données biométriques faciales supprimées.';
+      _statusMessage = _usesNativeBiometrics
+          ? 'Face ID désactivé sur cet appareil.'
+          : 'Données biométriques faciales supprimées.';
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Empreinte faciale supprimée.'),
+      SnackBar(
+        content: Text(_usesNativeBiometrics
+            ? 'Face ID désactivé.'
+            : 'Empreinte faciale supprimée.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -340,15 +491,36 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          // ── Flux Caméra ──────────────────────────────────
+                          // ── Flux Caméra (Web) / Capteur natif (mobile) ───
                           if (kIsWeb)
                             buildCameraView()
                           else
-                            const Center(
-                              child: Icon(
-                                Icons.face_rounded,
-                                size: 64,
-                                color: Colors.white24,
+                            Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.face_rounded,
+                                    size: 64,
+                                    color: Colors.white24,
+                                  ),
+                                  if (_usesNativeBiometrics) ...[
+                                    const SizedBox(height: 10),
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 20),
+                                      child: Text(
+                                        'Capteur biométrique du téléphone',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Color(0xFF64748B),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
 
@@ -369,8 +541,8 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                             ),
                           ),
 
-                          // ── Laser de scan animé ──────────────────────────
-                          if (_isProcessing)
+                          // ── Laser de scan animé (Web uniquement) ─────────
+                          if (kIsWeb && _isProcessing)
                             AnimatedBuilder(
                               animation: _scanAnimation,
                               builder: (context, _) {
@@ -495,21 +667,29 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                   ),
                   const SizedBox(height: 18),
 
-                  // ── Bouton principal de capture ───────────────────────────
+                  // ── Bouton principal de capture / activation ──────────────
                   AppButton(
-                    label: hasFace
-                        ? 'Mettre à jour mon visage'
-                        : 'Capturer mon visage',
-                    icon: Icons.camera_alt_rounded,
+                    label: _usesNativeBiometrics
+                        ? (hasFace
+                            ? 'Mettre à jour Face ID'
+                            : 'Activer Face ID')
+                        : (hasFace
+                            ? 'Mettre à jour mon visage'
+                            : 'Capturer mon visage'),
+                    icon: _usesNativeBiometrics
+                        ? Icons.fingerprint_rounded
+                        : Icons.camera_alt_rounded,
                     isLoading: _isProcessing,
                     onPressed: _isProcessing ? null : _handleCaptureFace,
                   ),
                   const SizedBox(height: 10),
 
-                  // ── Bouton Supprimer mon visage (si configuré) ─────────────
+                  // ── Bouton Supprimer / Désactiver (si configuré) ──────────
                   if (hasFace) ...[
                     AppButton.destructive(
-                      label: 'Supprimer mon visage',
+                      label: _usesNativeBiometrics
+                          ? 'Désactiver Face ID'
+                          : 'Supprimer mon visage',
                       icon: Icons.delete_outline_rounded,
                       onPressed: _isProcessing ? null : _handleRemoveFace,
                     ),

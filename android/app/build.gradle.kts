@@ -43,3 +43,10 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Requis par local_auth : LaunchTheme/NormalTheme doivent hériter d'un
+    // thème AppCompat pour éviter un crash du dialogue biométrique
+    // sur Android 8 et inférieur.
+    implementation("androidx.appcompat:appcompat:1.7.0")
+}

@@ -249,9 +249,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       );
     }
 
-    final faceIdSummary = (user.biometricFaceEnabled || user.hasFaceRegistered)
-        ? 'Face ID activé'
-        : 'Désactivé';
+    final faceIdSummary = user.biometricFingerprintEnabled && (user.biometricFaceEnabled || user.hasFaceRegistered)
+        ? 'Empreinte · Face ID'
+        : user.biometricFingerprintEnabled
+            ? 'Empreinte activée'
+            : (user.biometricFaceEnabled || user.hasFaceRegistered)
+                ? 'Face ID activé'
+                : 'Désactivé';
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
@@ -402,7 +406,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 padding: EdgeInsets.zero,
                 child: Column(
                   children: [
-                    // Face ID
+                    // Biométrie (Face ID + Empreinte)
                     ListTile(
                       leading: Container(
                         padding: const EdgeInsets.all(8),
@@ -412,11 +416,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                               : AppColors.secondarySoft,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.face_retouching_natural_rounded,
+                        child: const Icon(Icons.fingerprint_rounded,
                             color: AppColors.secondary, size: 20),
                       ),
                       title: Text(
-                        'Reconnaissance faciale Face ID',
+                        'Sécurité biométrique',
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,

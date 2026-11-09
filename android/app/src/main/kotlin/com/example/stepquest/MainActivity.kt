@@ -1,5 +1,6 @@
 package com.example.stepquest
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// FlutterFragmentActivity est requis par le plugin local_auth (BiometricPrompt).
+class MainActivity : FlutterFragmentActivity()

@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
-import '../models/app_user.dart';
 import '../state/app_state_provider.dart';
 
 class UserActivityChart extends StatefulWidget {

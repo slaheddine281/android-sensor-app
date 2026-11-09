@@ -59,6 +59,25 @@ class AuthState extends ChangeNotifier {
     }
   }
 
+  /// Fetch a profile row from public.profiles by e-mail (Face ID login when
+  /// no Supabase session and the local user list is still empty).
+  Future<AppUser?> _fetchProfileByEmail(String email) async {
+    final sb = _supabase;
+    if (sb == null) return null;
+    try {
+      final data = await sb
+          .from(SupabaseConstants.profilesTable)
+          .select()
+          .eq('email', email.trim().toLowerCase())
+          .maybeSingle();
+      if (data == null) return null;
+      return AppUser.fromMap(data);
+    } catch (e) {
+      debugPrint('_fetchProfileByEmail error: $e');
+      return null;
+    }
+  }
+
   /// Check session on splash screen (uses Supabase persisted session when available)
   Future<bool> checkExistingSession(UserState userState) async {
     _isLoading = true;
@@ -373,18 +392,24 @@ class AuthState extends ChangeNotifier {
     required NotificationState notificationState,
     required MockBiometricService biometricService,
     String? targetEmail,
+    bool biometricVerified = false,
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
-    final result = await biometricService.authenticate(type: type);
+    // Sur mobile, l'écran appelle d'abord le capteur natif puis nous transmet
+    // `biometricVerified: true` pour éviter de demander deux fois le Face ID.
+    // Sur le Web, le scan facial 128D a également déjà été effectué.
+    if (!biometricVerified) {
+      final result = await biometricService.authenticate(type: type);
 
-    if (result != BiometricAuthResult.success) {
-      _errorMessage = "Échec de l'authentification biométrique.";
-      _isLoading = false;
-      notifyListeners();
-      return false;
+      if (result != BiometricAuthResult.success) {
+        _errorMessage = MockBiometricService.messageFor(result);
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
     }
 
     AppUser? user;
@@ -396,8 +421,24 @@ class AuthState extends ChangeNotifier {
       }
     }
 
-    if (user == null && targetEmail != null) {
-      user = userState.findByEmail(targetEmail);
+    if (user == null && targetEmail != null && targetEmail.trim().isNotEmpty) {
+      user = userState.findByEmail(targetEmail) ??
+          await _fetchProfileByEmail(targetEmail);
+    }
+
+    // Dernier recours (mobile) : restaure le profil enrôlé sur l'appareil
+    // lorsqu'aucune session Supabase n'est active (ex. après redémarrage).
+    if (user == null && biometricService.isNativePlatform) {
+      final requested = targetEmail?.trim().toLowerCase() ?? '';
+      final boundEmail = await biometricService.boundAccountEmail();
+      final cached = await biometricService.cachedBoundProfile();
+      if (cached != null &&
+          boundEmail != null &&
+          cached.email.trim().toLowerCase() == boundEmail &&
+          (requested.isEmpty ||
+              cached.email.trim().toLowerCase() == requested)) {
+        user = cached;
+      }
     }
 
     if (user == null) {
@@ -406,13 +447,23 @@ class AuthState extends ChangeNotifier {
       );
       if (candidates.isNotEmpty) {
         user = candidates.first;
-      } else if (userState.allUsers.isNotEmpty) {
-        user = userState.allUsers.first;
       }
     }
 
     if (user == null) {
-      _errorMessage = "Aucun profil configuré pour cette biométrie.";
+      _errorMessage = (targetEmail != null && targetEmail.trim().isNotEmpty)
+          ? "Profil introuvable. Connectez-vous d'abord avec votre mot de passe."
+          : "Aucun profil configuré pour cette biométrie.";
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    // Sécurité : impossible de se connecter en Face ID avec un compte qui n'a
+    // jamais activé la biométrie (régression corrigée).
+    if (!user.hasFaceRegistered && !user.biometricFaceEnabled) {
+      _errorMessage =
+          "Aucun visage n'est enregistré pour ce compte. Activez Face ID dans les paramètres.";
       _isLoading = false;
       notifyListeners();
       return false;
@@ -428,6 +479,8 @@ class AuthState extends ChangeNotifier {
     final updated = user.copyWith(lastLoginAt: DateTime.now());
     if (userState.findById(updated.id) != null) {
       userState.updateUser(updated);
+    } else {
+      userState.addUser(updated);
     }
     _currentUser = updated;
     _isLoading = false;

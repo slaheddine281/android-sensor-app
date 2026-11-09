@@ -340,7 +340,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 icon: Icons.shield_outlined,
                 iconColor: AppColors.secondary,
                 title: 'Paramètres de sécurité',
-                subtitle: 'Sécurité biométrique Face ID',
+                subtitle: 'Empreinte digitale & Face ID',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(

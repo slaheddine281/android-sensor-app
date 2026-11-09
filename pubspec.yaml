@@ -16,6 +16,12 @@ dependencies:
   # Supabase SDK for Flutter (Auth + Database)
   supabase_flutter: ^2.8.0
 
+  # Authentification biométrique native (Face ID / empreinte) sur Android & iOS
+  local_auth: ^2.3.0
+
+  # Liaison du Face ID natif au compte enrôlé sur l'appareil
+  shared_preferences: ^2.5.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

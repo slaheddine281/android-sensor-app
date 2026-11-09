@@ -8,6 +8,8 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Stepquest</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>StepQuest utilise Face ID pour sécuriser la connexion à votre compte.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

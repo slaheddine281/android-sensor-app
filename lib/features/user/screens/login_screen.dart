@@ -78,11 +78,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleBiometricLogin(BiometricType type) async {
+    final typedEmail = _emailController.text.trim();
     final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => BiometricAuthScreen(
           type: type,
-          targetEmail: _emailController.text.trim(),
+          targetEmail: typedEmail.isEmpty ? null : typedEmail,
         ),
       ),
     );
@@ -331,11 +332,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Connexion Face ID UNIQUEMENT (L'empreinte digitale a été supprimée)
+                    // Connexion Face ID
                     BiometricQuickButton(
                       icon: Icons.face_retouching_natural_rounded,
                       label: 'Connexion sécurisée Face ID',
                       onPressed: () => _handleBiometricLogin(BiometricType.face),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Connexion Empreinte digitale
+                    BiometricQuickButton(
+                      icon: Icons.fingerprint_rounded,
+                      label: 'Connexion par empreinte digitale',
+                      onPressed: () =>
+                          _handleBiometricLogin(BiometricType.fingerprint),
                     ),
                     const SizedBox(height: 24),
 

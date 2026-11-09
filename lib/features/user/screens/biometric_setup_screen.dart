@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../services/mock_biometric_service.dart';
@@ -23,8 +25,18 @@ class BiometricSetupScreen extends StatefulWidget {
 
 class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   bool _faceEnabled = true;
+  bool _fingerprintEnabled = false;
   bool _isSaving = false;
   bool _isInitialized = false;
+
+  /// Sur téléphone, on s'appuie sur la biométrie native du système.
+  bool get _usesNativeBiometrics {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows;
+  }
 
   @override
   void didChangeDependencies() {
@@ -33,6 +45,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
       final user = context.auth.currentUser;
       if (user != null) {
         _faceEnabled = user.biometricFaceEnabled;
+        _fingerprintEnabled = user.biometricFingerprintEnabled;
       }
       _isInitialized = true;
     }
@@ -57,7 +70,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     final currentUser = context.auth.currentUser;
     if (currentUser != null) {
       final updated = currentUser.copyWith(
-        biometricFingerprintEnabled: false,
+        biometricFingerprintEnabled: _fingerprintEnabled,
         biometricFaceEnabled: _faceEnabled,
       );
 
@@ -72,7 +85,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Préférences Face ID enregistrées avec succès.'),
+        content: Text('Préférences biométriques enregistrées avec succès.'),
         backgroundColor: AppColors.secondary,
         behavior: SnackBarBehavior.floating,
       ),
@@ -201,7 +214,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                   Text(
                                     _faceEnabled
                                         ? (hasFaceRegistered
-                                            ? 'Modèle 128D configuré'
+                                            ? (_usesNativeBiometrics
+                                                ? 'Face ID activé sur cet appareil'
+                                                : 'Modèle 128D configuré')
                                             : 'Visage non configuré')
                                         : 'Désactivé',
                                     style: TextStyle(
@@ -237,10 +252,16 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
                     // Bouton Enrôlement / Scanner Visage
                     AppButton(
-                      label: hasFaceRegistered
-                          ? 'Recalibrer / Mettre à jour mon visage'
-                          : 'Scanner et enregistrer mon visage',
-                      icon: Icons.camera_enhance_rounded,
+                      label: _usesNativeBiometrics
+                          ? (hasFaceRegistered
+                              ? 'Mettre à jour Face ID'
+                              : 'Activer Face ID')
+                          : (hasFaceRegistered
+                              ? 'Recalibrer / Mettre à jour mon visage'
+                              : 'Scanner et enregistrer mon visage'),
+                      icon: _usesNativeBiometrics
+                          ? Icons.fingerprint_rounded
+                          : Icons.camera_enhance_rounded,
                       onPressed: () async {
                         await Navigator.of(context).push(
                           MaterialPageRoute(
@@ -250,6 +271,111 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                         if (mounted) setState(() {});
                       },
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Carte Empreinte Digitale ───────────────────────────────────
+              AppCard(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? const Color(0xFF064E3B).withValues(alpha: 0.3)
+                                : AppColors.secondarySoft,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.fingerprint_rounded,
+                            color: AppColors.secondary,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Empreinte digitale',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      color: _fingerprintEnabled
+                                          ? AppColors.secondary
+                                          : AppColors.textMuted,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _fingerprintEnabled
+                                        ? (_usesNativeBiometrics
+                                            ? 'Empreinte activée sur cet appareil'
+                                            : 'Empreinte activée')
+                                        : 'Désactivée',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: _fingerprintEnabled
+                                          ? AppColors.secondary
+                                          : AppColors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _fingerprintEnabled,
+                          activeThumbColor: AppColors.secondary,
+                          activeTrackColor:
+                              AppColors.secondary.withValues(alpha: 0.2),
+                          onChanged: (val) {
+                            setState(() {
+                              _fingerprintEnabled = val;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    if (_fingerprintEnabled && _usesNativeBiometrics) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 12),
+                      AppButton(
+                        label: 'Tester l\'empreinte digitale',
+                        icon: Icons.fingerprint_rounded,
+                        onPressed: () async {
+                          await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const BiometricAuthScreen(
+                                type: BiometricType.fingerprint,
+                                isSimulationTestOnly: true,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -278,7 +404,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'StepQuest utilise un réseau neuronal pour générer une empreinte vectorielle 128D stockée de manière sécurisée. Vos données faciales ne sont jamais partagées.',
+                        _usesNativeBiometrics
+                            ? 'StepQuest utilise le Face ID / capteur biométrique natif de votre téléphone. Aucune image de votre visage n\'est enregistrée ni partagée par l\'application.'
+                            : 'StepQuest utilise un réseau neuronal pour générer une empreinte vectorielle 128D stockée de manière sécurisée. Vos données faciales ne sont jamais partagées.',
                         style: TextStyle(
                           fontSize: 13,
                           color: isDark ? Colors.white : AppColors.textPrimary,
