@@ -9,6 +9,7 @@ import '../../../widgets/app_button.dart';
 import '../../../widgets/app_card.dart';
 import '../../shared/screens/biometric_auth_screen.dart';
 import 'face_enrollment_screen.dart';
+import 'fingerprint_enrollment_screen.dart';
 import 'user_home_screen.dart';
 
 class BiometricSetupScreen extends StatefulWidget {
@@ -357,11 +358,33 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    // Bouton Enrôlement / Scanner Empreinte
+                    AppButton(
+                      label: _fingerprintEnabled
+                          ? 'Mettre à jour mon empreinte'
+                          : 'Scanner et enregistrer mon empreinte',
+                      icon: Icons.fingerprint_rounded,
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const FingerprintEnrollmentScreen(),
+                          ),
+                        );
+                        if (mounted) {
+                          final user = context.auth.currentUser;
+                          setState(() {
+                            _fingerprintEnabled =
+                                user?.biometricFingerprintEnabled ?? false;
+                          });
+                        }
+                      },
+                    ),
                     if (_fingerprintEnabled && _usesNativeBiometrics) ...[
-                      const SizedBox(height: 16),
-                      const Divider(),
-                      const SizedBox(height: 12),
-                      AppButton(
+                      const SizedBox(height: 10),
+                      AppButton.secondary(
                         label: 'Tester l\'empreinte digitale',
                         icon: Icons.fingerprint_rounded,
                         onPressed: () async {

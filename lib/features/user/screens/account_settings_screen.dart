@@ -249,7 +249,8 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       );
     }
 
-    final faceIdSummary = user.biometricFingerprintEnabled && (user.biometricFaceEnabled || user.hasFaceRegistered)
+    final biometricSummary = user.biometricFingerprintEnabled &&
+            (user.biometricFaceEnabled || user.hasFaceRegistered)
         ? 'Empreinte · Face ID'
         : user.biometricFingerprintEnabled
             ? 'Empreinte activée'
@@ -427,7 +428,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                             color: isDark ? Colors.white : AppColors.textPrimary),
                       ),
                       subtitle: Text(
-                        faceIdSummary,
+                        biometricSummary,
                         style: TextStyle(
                             fontSize: 12,
                             color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),

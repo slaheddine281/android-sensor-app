@@ -11,6 +11,7 @@ import '../../../widgets/user_avatar.dart';
 import 'account_settings_screen.dart';
 import 'edit_profile_screen.dart';
 import 'face_enrollment_screen.dart';
+import 'fingerprint_enrollment_screen.dart';
 import 'login_screen.dart';
 import 'user_home_screen.dart';
 
@@ -272,15 +273,39 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         _buildInfoRow(
                           icon: Icons.shield_outlined,
                           label: 'Sécurité Biométrique',
-                          value: (user.biometricFaceEnabled || user.hasFaceRegistered)
-                              ? 'Face ID configuré'
-                              : 'Désactivé',
+                          value: user.biometricFingerprintEnabled &&
+                                  (user.biometricFaceEnabled ||
+                                      user.hasFaceRegistered)
+                              ? 'Empreinte · Face ID'
+                              : user.biometricFingerprintEnabled
+                                  ? 'Empreinte activée'
+                                  : (user.biometricFaceEnabled ||
+                                          user.hasFaceRegistered)
+                                      ? 'Face ID configuré'
+                                      : 'Désactivé',
                           isDark: isDark,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+
+                  // ── Actions Biométriques Profil (Empreinte + Face ID) ─────
+                  AppButton(
+                    label: user.biometricFingerprintEnabled
+                        ? 'Gérer mon Empreinte Digitale'
+                        : 'Enregistrer mon Empreinte Digitale',
+                    icon: Icons.fingerprint_rounded,
+                    onPressed: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const FingerprintEnrollmentScreen(),
+                        ),
+                      );
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                  const SizedBox(height: 10),
 
                   // Face ID enrollment button
                   AppButton(
@@ -288,12 +313,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         ? 'Gérer mon Face ID'
                         : 'Activer la Reconnaissance Faciale (Face ID)',
                     icon: Icons.face_rounded,
-                    onPressed: () {
-                      Navigator.of(context).push(
+                    onPressed: () async {
+                      await Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const FaceEnrollmentScreen(),
                         ),
                       );
+                      if (mounted) setState(() {});
                     },
                   ),
                   const SizedBox(height: 10),

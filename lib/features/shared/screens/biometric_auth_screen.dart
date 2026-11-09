@@ -194,8 +194,9 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     if (typedEmail.isNotEmpty && typedEmail.toLowerCase() != boundEmail) {
       setState(() {
         _isSuccess = false;
-        _statusMessage =
-            'Ce Face ID est associé à un autre compte sur cet appareil.';
+        _statusMessage = widget.type == BiometricType.fingerprint
+            ? 'Cette empreinte est associée à un autre compte sur cet appareil.'
+            : 'Ce Face ID est associé à un autre compte sur cet appareil.';
       });
       return null;
     }
@@ -222,7 +223,9 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
           _isVerifying = false;
           _isSuccess = false;
           _statusMessage = context.auth.errorMessage ??
-              'Connexion Face ID impossible. Utilisez votre mot de passe.';
+              (widget.type == BiometricType.fingerprint
+                  ? 'Connexion par empreinte impossible. Utilisez votre mot de passe.'
+                  : 'Connexion Face ID impossible. Utilisez votre mot de passe.');
         });
         return;
       }
