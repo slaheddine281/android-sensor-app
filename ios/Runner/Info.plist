@@ -10,6 +10,8 @@
 	<string>Stepquest</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>StepQuest utilise Face ID pour sécuriser la connexion à votre compte.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>StepQuest utilise la caméra pour capturer votre visage et activer la reconnaissance faciale.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

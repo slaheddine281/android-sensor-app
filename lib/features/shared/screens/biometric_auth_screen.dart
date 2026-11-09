@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
@@ -705,39 +707,11 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Flux Caméra (Web uniquement) ─────────────────────────────────
+          // ── Flux Caméra (Web) / Photo enregistrée ou icône (Mobile) ────
           if (kIsWeb)
             buildCameraView()
           else
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.face_retouching_natural_rounded,
-                    size: 70,
-                    color: _isSuccess == true
-                        ? AppColors.secondary
-                        : Colors.white24,
-                  ),
-                  if (_usesNativeBiometrics) ...[
-                    const SizedBox(height: 10),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 18),
-                      child: Text(
-                        'Capteur biométrique du téléphone',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+            _buildMobileFacePreview(),
 
           // ── Ovale guide facial ────────────────────────────────────────────
           Center(
@@ -893,6 +867,63 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
           ),
         );
       },
+    );
+  }
+
+  /// Aperçu visuel facial sur mobile (photo de l'utilisateur ou icône moderne)
+  Widget _buildMobileFacePreview() {
+    final typed = (widget.targetEmail ?? '').trim();
+    final user = typed.isNotEmpty
+        ? context.users.findByEmail(typed)
+        : context.auth.currentUser;
+    final photo = user?.facePhotoUrl;
+    if (photo != null && photo.isNotEmpty) {
+      try {
+        if (photo.startsWith('data:image')) {
+          final base64Str = photo.split(',').last;
+          return Image.memory(
+            base64Decode(base64Str),
+            fit: BoxFit.cover,
+          );
+        } else if (photo.startsWith('http')) {
+          return Image.network(
+            photo,
+            fit: BoxFit.cover,
+          );
+        } else {
+          return Image.memory(
+            base64Decode(photo),
+            fit: BoxFit.cover,
+          );
+        }
+      } catch (_) {}
+    }
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.face_retouching_natural_rounded,
+            size: 70,
+            color: _isSuccess == true ? AppColors.secondary : Colors.white24,
+          ),
+          if (_usesNativeBiometrics) ...[
+            const SizedBox(height: 10),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18),
+              child: Text(
+                'Capteur biométrique du téléphone',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

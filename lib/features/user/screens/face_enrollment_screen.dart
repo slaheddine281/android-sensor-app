@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../models/app_user.dart';
 import '../../../services/face_recognition_service.dart';
 import '../../../services/mock_biometric_service.dart';
 import '../../../state/app_state_provider.dart';
@@ -33,6 +37,8 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   bool _isProcessing = false;
   bool _cameraActive = false;
   bool _modelLoading = false;
+  Uint8List? _capturedImageBytes;
+  final ImagePicker _imagePicker = ImagePicker();
   String _statusMessage = 'Démarrage de la caméra...';
 
   /// Sur téléphone, on utilise la biométrie native (Face ID / empreinte).
@@ -59,7 +65,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     );
 
     _statusMessage = _usesNativeBiometrics
-        ? 'Appuyez sur "Activer Face ID" puis validez avec votre visage ou votre empreinte.'
+        ? 'Prenez une photo de votre visage avec l\'appareil photo frontal pour activer Face ID.'
         : 'Démarrage de la caméra...';
 
     // Initialiser la caméra après le premier rendu (Web uniquement)
@@ -241,70 +247,90 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     }
   }
 
-  /// Enrôlement sur téléphone : on s'appuie sur le Face ID / capteur
-  /// biométrique natif. Aucun vecteur 128D n'est calculé côté mobile.
+  /// Enrôlement sur téléphone : ouvre l'appareil photo frontal pour capturer
+  /// le visage de l'utilisateur, l'affiche dans le cadre et active Face ID.
   Future<void> _enrollWithDeviceBiometrics() async {
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Validation de votre identité par le capteur biométrique...';
+      _statusMessage = 'Ouverture de l\'appareil photo frontal...';
     });
 
-    final result = await _biometricService?.authenticate(
-          type: BiometricType.face,
-          reason: 'Activez Face ID pour sécuriser votre compte StepQuest',
-        ) ??
-        BiometricAuthResult.unavailable;
+    try {
+      final XFile? file = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        maxWidth: 720,
+        maxHeight: 720,
+        imageQuality: 85,
+      );
 
-    if (!mounted) return;
+      if (file == null) {
+        if (!mounted) return;
+        setState(() {
+          _isProcessing = false;
+          _statusMessage = 'Prise de photo annulée.';
+        });
+        return;
+      }
 
-    if (result != BiometricAuthResult.success) {
+      final bytes = await file.readAsBytes();
+      final base64Photo = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
+      if (!mounted) return;
+
+      setState(() {
+        _capturedImageBytes = bytes;
+        _statusMessage = 'Visage capturé ! Enregistrement du profil...';
+      });
+
+      final currentUser = context.auth.currentUser;
+      if (currentUser != null) {
+        final updated = currentUser.copyWith(
+          faceEmbedding: MockBiometricService.deviceBiometricMarker,
+          facePhotoUrl: base64Photo,
+          biometricFaceEnabled: true,
+        );
+
+        await context.auth.updateCurrentProfile(
+          updatedUser: updated,
+          userState: context.users,
+          notificationState: context.notifications,
+        );
+
+        // Lie ce Face ID natif à CE compte sur CET appareil.
+        await _biometricService?.bindAccountToDevice(currentUser.email);
+        await _biometricService?.cacheBoundProfile(updated);
+      }
+
+      if (!mounted) return;
+
       setState(() {
         _isProcessing = false;
-        _statusMessage = MockBiometricService.messageFor(result);
+        _statusMessage = '✓ Visage enregistré et Face ID activé avec succès !';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Visage enregistré et Face ID activé avec succès !'),
+          backgroundColor: AppColors.secondary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = 'Erreur lors de l\'accès à l\'appareil photo : $e';
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(MockBiometricService.messageFor(result)),
+          content: Text('Erreur caméra : $e'),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
-      return;
     }
-
-    final currentUser = context.auth.currentUser;
-    if (currentUser != null) {
-      final updated = currentUser.copyWith(
-        faceEmbedding: MockBiometricService.deviceBiometricMarker,
-        biometricFaceEnabled: true,
-      );
-
-      await context.auth.updateCurrentProfile(
-        updatedUser: updated,
-        userState: context.users,
-        notificationState: context.notifications,
-      );
-
-      // Lie ce Face ID natif à CE compte sur CET appareil.
-      await _biometricService?.bindAccountToDevice(currentUser.email);
-      await _biometricService?.cacheBoundProfile(updated);
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _isProcessing = false;
-      _statusMessage = '✓ Face ID activé avec succès sur cet appareil !';
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Face ID activé avec succès sur cet appareil !'),
-        backgroundColor: AppColors.secondary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
   }
 
   Future<void> _handleRemoveFace() async {
@@ -353,6 +379,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     if (!mounted) return;
 
     setState(() {
+      _capturedImageBytes = null;
       _statusMessage = _usesNativeBiometrics
           ? 'Face ID désactivé sur cet appareil.'
           : 'Données biométriques faciales supprimées.';
@@ -491,38 +518,8 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          // ── Flux Caméra (Web) / Capteur natif (mobile) ───
-                          if (kIsWeb)
-                            buildCameraView()
-                          else
-                            Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.face_rounded,
-                                    size: 64,
-                                    color: Colors.white24,
-                                  ),
-                                  if (_usesNativeBiometrics) ...[
-                                    const SizedBox(height: 10),
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                          horizontal: 20),
-                                      child: Text(
-                                        'Capteur biométrique du téléphone',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Color(0xFF64748B),
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
+                          // ── Flux Caméra (Web) / Photo capturée (Mobile) ──
+                          _buildFacePreview(user),
 
                           // ── Ovale guide facial ───────────────────────────
                           Center(
@@ -671,13 +668,13 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                   AppButton(
                     label: _usesNativeBiometrics
                         ? (hasFace
-                            ? 'Mettre à jour Face ID'
-                            : 'Activer Face ID')
+                            ? 'Reprendre une photo de mon visage'
+                            : 'Ouvrir l\'appareil photo frontal')
                         : (hasFace
                             ? 'Mettre à jour mon visage'
                             : 'Capturer mon visage'),
                     icon: _usesNativeBiometrics
-                        ? Icons.fingerprint_rounded
+                        ? Icons.camera_front_rounded
                         : Icons.camera_alt_rounded,
                     isLoading: _isProcessing,
                     onPressed: _isProcessing ? null : _handleCaptureFace,
@@ -756,5 +753,67 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       corner(bottom: true, left: true),
       corner(bottom: true, right: true),
     ];
+  }
+
+  /// Aperçu visuel du visage : flux webcam sur le Web, ou photo capturée sur mobile
+  Widget _buildFacePreview(AppUser? user) {
+    if (kIsWeb) {
+      return buildCameraView();
+    }
+    if (_capturedImageBytes != null) {
+      return Image.memory(
+        _capturedImageBytes!,
+        fit: BoxFit.cover,
+      );
+    }
+    final photo = user?.facePhotoUrl;
+    if (photo != null && photo.isNotEmpty) {
+      try {
+        if (photo.startsWith('data:image')) {
+          final base64Str = photo.split(',').last;
+          return Image.memory(
+            base64Decode(base64Str),
+            fit: BoxFit.cover,
+          );
+        } else if (photo.startsWith('http')) {
+          return Image.network(
+            photo,
+            fit: BoxFit.cover,
+          );
+        } else {
+          return Image.memory(
+            base64Decode(photo),
+            fit: BoxFit.cover,
+          );
+        }
+      } catch (_) {
+        // Fallback si décodage échoue
+      }
+    }
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.camera_front_rounded,
+            size: 64,
+            color: AppColors.primaryLight,
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Appuyez sur le bouton ci-dessous pour ouvrir l\'appareil photo',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
