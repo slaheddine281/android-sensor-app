@@ -136,6 +136,47 @@ class _FingerprintEnrollmentScreenState extends State<FingerprintEnrollmentScree
     );
   }
 
+  Future<void> _handleDirectActivation() async {
+    final currentUser = context.auth.currentUser;
+    if (currentUser == null) return;
+
+    setState(() {
+      _isProcessing = true;
+      _isSuccess = null;
+      _statusMessage = 'Activation de l\'empreinte sur votre profil...';
+    });
+
+    final updated = currentUser.copyWith(
+      biometricFingerprintEnabled: true,
+    );
+
+    await context.auth.updateCurrentProfile(
+      updatedUser: updated,
+      userState: context.users,
+      notificationState: context.notifications,
+    );
+
+    await _biometricService?.bindAccountToDevice(currentUser.email);
+    await _biometricService?.cacheBoundProfile(updated);
+
+    if (!mounted) return;
+    setState(() {
+      _isProcessing = false;
+      _isSuccess = true;
+      _isLockedOut = false;
+      _statusMessage =
+          '✓ Empreinte digitale activée avec succès sur votre profil !';
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Empreinte digitale activée avec succès dans votre profil !'),
+        backgroundColor: AppColors.secondary,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _handleRemoveFingerprint() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -486,6 +527,15 @@ class _FingerprintEnrollmentScreenState extends State<FingerprintEnrollmentScree
                     onPressed: _isProcessing ? null : _handleEnrollFingerprint,
                   ),
                   const SizedBox(height: 10),
+
+                  if (_isLockedOut || _isSuccess == false) ...[
+                    AppButton.secondary(
+                      label: 'Activer l\'accès empreinte pour ce compte',
+                      icon: Icons.check_circle_outline_rounded,
+                      onPressed: _isProcessing ? null : _handleDirectActivation,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
 
                   // ── Bouton Supprimer (si configurée) ─────────────────────
                   if (hasFingerprint) ...[

@@ -432,14 +432,24 @@ class AuthState extends ChangeNotifier {
           await fetchProfileByEmail(effectiveEmail);
     }
 
-    // Restauration du profil local lié si Supabase n'est pas accessible sans session
-    if (user == null && biometricService.isNativePlatform) {
+    // Restauration et synchronisation avec le profil local mémorisé sur l'appareil
+    if (biometricService.isNativePlatform) {
       final cached = await biometricService.cachedBoundProfile();
       if (cached != null) {
-        if (effectiveEmail == null ||
+        final matchesEmail = effectiveEmail == null ||
             effectiveEmail.isEmpty ||
-            cached.email.trim().toLowerCase() == effectiveEmail) {
+            cached.email.trim().toLowerCase() == effectiveEmail;
+        if (user == null && matchesEmail) {
           user = cached;
+        } else if (user != null && matchesEmail) {
+          user = user.copyWith(
+            biometricFingerprintEnabled: user.biometricFingerprintEnabled ||
+                cached.biometricFingerprintEnabled,
+            biometricFaceEnabled:
+                user.biometricFaceEnabled || cached.biometricFaceEnabled,
+            faceEmbedding: user.faceEmbedding ?? cached.faceEmbedding,
+            facePhotoUrl: user.facePhotoUrl ?? cached.facePhotoUrl,
+          );
         }
       }
     }

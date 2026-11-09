@@ -136,13 +136,8 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     if (!mounted) return;
     setState(() {
       _resolvedAccountUser = user;
-      if (user != null) {
-        _statusMessage =
-            'Compte détecté : ${user.fullName}. Appuyez sur « Scanner mon visage » pour vous connecter.';
-      } else {
-        _statusMessage =
-            'Prêt pour Face ID. Appuyez sur « Scanner mon visage » pour vous connecter.';
-      }
+      _statusMessage =
+          'Prêt pour Face ID. Appuyez sur « Scanner mon visage » pour vous connecter.';
     });
   }
 
@@ -721,8 +716,8 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                       label: _isSuccess == true
                           ? 'Visage validé'
                           : _isVerifying
-                              ? 'Vérification en cours...'
-                              : 'Scanner mon visage (Caméra)',
+                              ? 'Vérification...'
+                              : 'Scanner mon visage',
                       icon: Icons.camera_front_rounded,
                       isLoading: _isVerifying,
                       onPressed: (_isVerifying || _isSuccess == true)
@@ -731,7 +726,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                     ),
                     const SizedBox(height: 10),
                     AppButton.secondary(
-                      label: 'Valider avec le capteur du téléphone',
+                      label: 'Capteur du téléphone',
                       icon: Icons.fingerprint_rounded,
                       onPressed: (_isVerifying || _isSuccess == true)
                           ? null
@@ -747,8 +742,8 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                           : _isVerifying
                               ? 'Analyse en cours...'
                               : (widget.type == BiometricType.fingerprint
-                                  ? 'Vérifier avec l\'empreinte'
-                                  : 'Vérifier avec Face ID'),
+                                  ? 'Scanner mon empreinte'
+                                  : 'Scanner mon visage'),
                       icon: widget.type == BiometricType.fingerprint
                           ? Icons.fingerprint_rounded
                           : Icons.face_retouching_natural_rounded,
@@ -1054,7 +1049,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     );
   }
 
-  /// Aperçu visuel facial sur mobile (photo capturée, photo enregistrée ou icône)
+  /// Aperçu visuel facial sur mobile (état initial neutre ou photo capturée)
   Widget _buildMobileFacePreview() {
     if (_capturedImageBytes != null) {
       return Image.memory(
@@ -1063,60 +1058,31 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       );
     }
 
-    final typed = (widget.targetEmail ?? '').trim().toLowerCase();
-    final user = typed.isNotEmpty
-        ? (context.users.findByEmail(typed) ?? _resolvedAccountUser)
-        : (_resolvedAccountUser ?? context.auth.currentUser);
-
-    final photo = user?.facePhotoUrl;
-    if (photo != null && photo.isNotEmpty && photo != 'stored-locally') {
-      try {
-        if (photo.startsWith('data:image')) {
-          final base64Str = photo.split(',').last;
-          return Image.memory(
-            base64Decode(base64Str),
-            fit: BoxFit.cover,
-          );
-        } else if (photo.startsWith('http')) {
-          return Image.network(
-            photo,
-            fit: BoxFit.cover,
-          );
-        } else {
-          return Image.memory(
-            base64Decode(photo),
-            fit: BoxFit.cover,
-          );
-        }
-      } catch (_) {}
-    }
-
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.face_retouching_natural_rounded,
-            size: 70,
-            color: _isSuccess == true ? AppColors.secondary : Colors.white24,
+            size: 76,
+            color: _isSuccess == true
+                ? AppColors.secondary
+                : (_isVerifying ? AppColors.primaryLight : Colors.white24),
           ),
-          if (_usesNativeBiometrics) ...[
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Text(
-                user != null
-                    ? '${user.fullName}\nFace ID configuré'
-                    : 'Reconnaissance Faciale Face ID',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+          const SizedBox(height: 12),
+          Text(
+            _isSuccess == true
+                ? 'Visage identifié'
+                : (_isVerifying
+                    ? 'Analyse en cours...'
+                    : 'Reconnaissance Faciale Face ID'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: _isSuccess == true ? AppColors.secondary : const Color(0xFF94A3B8),
+              fontWeight: FontWeight.w600,
             ),
-          ],
+          ),
         ],
       ),
     );

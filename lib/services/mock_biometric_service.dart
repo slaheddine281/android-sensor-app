@@ -114,20 +114,34 @@ class MockBiometricService {
     }
   }
 
-  /// Mémorise localement le profil lié au Face ID de cet appareil.
+  /// Mémorise localement le profil lié au Face ID ou à l'empreinte de cet appareil.
   Future<void> cacheBoundProfile(AppUser user) async {
     if (kIsWeb) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final map = user.toMap();
-      final photo = user.facePhotoUrl;
-      if (photo != null && photo.isNotEmpty) {
+      final existing = await cachedBoundProfile();
+      final merged = existing == null
+          ? user
+          : user.copyWith(
+              facePhotoUrl: (user.facePhotoUrl != null &&
+                      user.facePhotoUrl!.isNotEmpty &&
+                      user.facePhotoUrl != 'stored-locally')
+                  ? user.facePhotoUrl
+                  : existing.facePhotoUrl,
+              faceEmbedding: user.faceEmbedding ?? existing.faceEmbedding,
+              biometricFaceEnabled:
+                  user.biometricFaceEnabled || existing.biometricFaceEnabled,
+              biometricFingerprintEnabled: user.biometricFingerprintEnabled ||
+                  existing.biometricFingerprintEnabled,
+            );
+      final map = merged.toMap();
+      final photo = merged.facePhotoUrl;
+      if (photo != null && photo.isNotEmpty && photo != 'stored-locally') {
         // Enregistre la photo sous une clé dédiée
         await prefs.setString(_photoKey, photo);
-        // Garde le JSON du profil léger et fiable
-        map['face_photo_url'] = 'stored-locally';
-        map['facePhotoUrl'] = 'stored-locally';
       }
+      map['face_photo_url'] = 'stored-locally';
+      map['facePhotoUrl'] = 'stored-locally';
       await prefs.setString(_cachedProfileKey, jsonEncode(map));
     } catch (e) {
       debugPrint('cacheBoundProfile error: $e');
@@ -195,15 +209,40 @@ class MockBiometricService {
       final canCheck = await _localAuth.canCheckBiometrics;
       if (!canCheck) return BiometricAuthResult.notEnrolled;
 
-      final ok = await _localAuth.authenticate(
-        localizedReason: reason,
-        options: const AuthenticationOptions(
-          // Permet au système Android d'offrir le code de secours en cas de verrouillage
-          biometricOnly: false,
-          stickyAuth: true,
-          useErrorDialogs: true,
-        ),
-      );
+      bool ok = false;
+      try {
+        ok = await _localAuth.authenticate(
+          localizedReason: reason,
+          options: const AuthenticationOptions(
+            biometricOnly: true,
+            stickyAuth: false,
+            useErrorDialogs: true,
+          ),
+        );
+      } on PlatformException catch (e) {
+        if (e.code == auth_error.lockedOut ||
+            e.code == auth_error.permanentlyLockedOut ||
+            e.code == auth_error.biometricOnlyNotSupported ||
+            e.code == auth_error.notAvailable) {
+          try {
+            ok = await _localAuth.authenticate(
+              localizedReason: reason,
+              options: const AuthenticationOptions(
+                biometricOnly: false,
+                stickyAuth: false,
+                useErrorDialogs: true,
+              ),
+            );
+          } catch (_) {
+            return (e.code == auth_error.lockedOut ||
+                    e.code == auth_error.permanentlyLockedOut)
+                ? BiometricAuthResult.lockedOut
+                : BiometricAuthResult.failed;
+          }
+        } else {
+          rethrow;
+        }
+      }
 
       return ok ? BiometricAuthResult.success : BiometricAuthResult.failed;
     } on PlatformException catch (e) {
