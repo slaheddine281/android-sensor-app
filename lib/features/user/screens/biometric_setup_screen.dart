@@ -9,7 +9,6 @@ import '../../../widgets/app_button.dart';
 import '../../../widgets/app_card.dart';
 import '../../shared/screens/biometric_auth_screen.dart';
 import 'face_enrollment_screen.dart';
-import 'fingerprint_enrollment_screen.dart';
 import 'user_home_screen.dart';
 
 class BiometricSetupScreen extends StatefulWidget {
@@ -26,7 +25,6 @@ class BiometricSetupScreen extends StatefulWidget {
 
 class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   bool _faceEnabled = true;
-  bool _fingerprintEnabled = false;
   bool _isSaving = false;
   bool _isInitialized = false;
 
@@ -45,8 +43,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     if (!_isInitialized) {
       final user = context.auth.currentUser;
       if (user != null) {
-        _faceEnabled = user.biometricFaceEnabled;
-        _fingerprintEnabled = user.biometricFingerprintEnabled;
+        _faceEnabled = user.biometricFaceEnabled || user.hasFaceRegistered;
       }
       _isInitialized = true;
     }
@@ -71,7 +68,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     final currentUser = context.auth.currentUser;
     if (currentUser != null) {
       final updated = currentUser.copyWith(
-        biometricFingerprintEnabled: _fingerprintEnabled,
         biometricFaceEnabled: _faceEnabled,
       );
 
@@ -261,7 +257,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                               ? 'Recalibrer / Mettre à jour mon visage'
                               : 'Scanner et enregistrer mon visage'),
                       icon: _usesNativeBiometrics
-                          ? Icons.fingerprint_rounded
+                          ? Icons.face_retouching_natural_rounded
                           : Icons.camera_enhance_rounded,
                       onPressed: () async {
                         await Navigator.of(context).push(
@@ -272,133 +268,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                         if (mounted) setState(() {});
                       },
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // ── Carte Empreinte Digitale ───────────────────────────────────
-              AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? const Color(0xFF064E3B).withValues(alpha: 0.3)
-                                : AppColors.secondarySoft,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.fingerprint_rounded,
-                            color: AppColors.secondary,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Empreinte digitale',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      color: _fingerprintEnabled
-                                          ? AppColors.secondary
-                                          : AppColors.textMuted,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _fingerprintEnabled
-                                        ? (_usesNativeBiometrics
-                                            ? 'Empreinte activée sur cet appareil'
-                                            : 'Empreinte activée')
-                                        : 'Désactivée',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: _fingerprintEnabled
-                                          ? AppColors.secondary
-                                          : AppColors.textMuted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        Switch(
-                          value: _fingerprintEnabled,
-                          activeThumbColor: AppColors.secondary,
-                          activeTrackColor:
-                              AppColors.secondary.withValues(alpha: 0.2),
-                          onChanged: (val) {
-                            setState(() {
-                              _fingerprintEnabled = val;
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    // Bouton Enrôlement / Scanner Empreinte
-                    AppButton(
-                      label: _fingerprintEnabled
-                          ? 'Mettre à jour mon empreinte'
-                          : 'Scanner et enregistrer mon empreinte',
-                      icon: Icons.fingerprint_rounded,
-                      onPressed: () async {
-                        await Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const FingerprintEnrollmentScreen(),
-                          ),
-                        );
-                        if (mounted) {
-                          final user = context.auth.currentUser;
-                          setState(() {
-                            _fingerprintEnabled =
-                                user?.biometricFingerprintEnabled ?? false;
-                          });
-                        }
-                      },
-                    ),
-                    if (_fingerprintEnabled && _usesNativeBiometrics) ...[
-                      const SizedBox(height: 10),
-                      AppButton.secondary(
-                        label: 'Tester l\'empreinte digitale',
-                        icon: Icons.fingerprint_rounded,
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const BiometricAuthScreen(
-                                type: BiometricType.fingerprint,
-                                isSimulationTestOnly: true,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
                   ],
                 ),
               ),

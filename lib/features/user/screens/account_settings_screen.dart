@@ -249,14 +249,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       );
     }
 
-    final biometricSummary = user.biometricFingerprintEnabled &&
-            (user.biometricFaceEnabled || user.hasFaceRegistered)
-        ? 'Empreinte · Face ID'
-        : user.biometricFingerprintEnabled
-            ? 'Empreinte activée'
-            : (user.biometricFaceEnabled || user.hasFaceRegistered)
-                ? 'Face ID activé'
-                : 'Désactivé';
+    final biometricSummary = (user.biometricFaceEnabled || user.hasFaceRegistered)
+        ? 'Face ID activé'
+        : 'Désactivé';
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
@@ -407,21 +402,21 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                 padding: EdgeInsets.zero,
                 child: Column(
                   children: [
-                    // Biométrie (Face ID + Empreinte)
+                    // Biométrie (Face ID)
                     ListTile(
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? const Color(0xFF064E3B).withValues(alpha: 0.4)
-                              : AppColors.secondarySoft,
+                              ? const Color(0xFF1E3A8A).withValues(alpha: 0.4)
+                              : AppColors.primarySoft,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.fingerprint_rounded,
-                            color: AppColors.secondary, size: 20),
+                        child: const Icon(Icons.face_retouching_natural_rounded,
+                            color: AppColors.primary, size: 20),
                       ),
                       title: Text(
-                        'Sécurité biométrique',
+                        'Reconnaissance Faciale (Face ID)',
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,

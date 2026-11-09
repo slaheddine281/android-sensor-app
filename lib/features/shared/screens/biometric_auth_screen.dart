@@ -53,15 +53,9 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
   Uint8List? _capturedImageBytes;
   AppUser? _resolvedAccountUser;
 
-  /// Sur téléphone (Android/iOS), on utilise le capteur biométrique natif.
+  /// Sur téléphone (Android/iOS), on utilise la caméra frontale native.
   /// Sur le Web, on garde le scan facial IA via la webcam.
-  /// L'empreinte digitale utilise TOUJOURS le natif (jamais la caméra web).
   bool get _usesNativeBiometrics {
-    if (widget.type == BiometricType.fingerprint) {
-      // L'empreinte est toujours gérée par le capteur natif (local_auth)
-      return !kIsWeb;
-    }
-    // Face ID : web → caméra IA, mobile → capteur natif ou caméra frontale
     if (kIsWeb) return false;
     return defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS ||
@@ -83,19 +77,13 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     );
 
     _statusMessage = _usesNativeBiometrics
-        ? (widget.type == BiometricType.fingerprint
-            ? 'Posez votre doigt sur le capteur d\'empreinte du téléphone...'
-            : 'Prêt pour Face ID. Appuyez sur « Scanner mon visage » pour vous connecter.')
+        ? 'Prêt pour Face ID. Appuyez sur « Scanner mon visage » pour vous connecter.'
         : 'Démarrage de la reconnaissance faciale Face ID...';
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_usesNativeBiometrics) {
-        if (widget.type == BiometricType.fingerprint) {
-          _authenticateWithDevice();
-        } else {
-          _loadBoundAccountInfo();
-        }
+        _loadBoundAccountInfo();
       } else {
         _startCameraAndPrepare();
       }
@@ -226,7 +214,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       _isVerifying = true;
       _isSuccess = null;
       _statusMessage =
-          'Authentification biométrique en cours... Validez avec ${widget.type == BiometricType.fingerprint ? 'votre empreinte' : 'votre capteur biométrique'}.';
+          'Authentification biométrique en cours... Validez avec votre capteur biométrique.';
     });
 
     final result = await _biometricService?.authenticate(
@@ -294,9 +282,8 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
         if (!silent) {
           setState(() {
             _isSuccess = false;
-            _statusMessage = widget.type == BiometricType.fingerprint
-                ? 'Cette empreinte est associée à un autre compte sur cet appareil ($boundEmail).'
-                : 'Ce Face ID est associé à un autre compte sur cet appareil ($boundEmail).';
+            _statusMessage =
+                'Ce Face ID est associé à un autre compte sur cet appareil ($boundEmail).';
           });
           _animController.stop();
         }
@@ -319,17 +306,14 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       }
 
       final hasBio = user != null &&
-          (widget.type == BiometricType.fingerprint
-              ? user.biometricFingerprintEnabled
-              : (user.biometricFaceEnabled || user.hasFaceRegistered));
+          (user.biometricFaceEnabled || user.hasFaceRegistered);
 
       if (user == null || !hasBio) {
         if (!silent) {
           setState(() {
             _isSuccess = false;
-            _statusMessage = widget.type == BiometricType.fingerprint
-                ? 'L\'empreinte digitale n\'est pas encore activée pour ce compte. Connectez-vous avec votre mot de passe puis activez-la dans votre profil.'
-                : 'Face ID n\'est pas configuré pour ce compte. Connectez-vous avec votre mot de passe puis configurez Face ID.';
+            _statusMessage =
+                'Face ID n\'est pas configuré pour ce compte. Connectez-vous avec votre mot de passe puis configurez Face ID.';
           });
           _animController.stop();
         }
@@ -340,9 +324,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
 
     // Aucun e-mail saisi : si un seul utilisateur est éligible, on le propose
     final candidates = context.users.allUsers.where((u) =>
-        widget.type == BiometricType.fingerprint
-            ? u.biometricFingerprintEnabled
-            : (u.biometricFaceEnabled || u.hasFaceRegistered)).toList();
+        u.biometricFaceEnabled || u.hasFaceRegistered).toList();
     if (candidates.length == 1) {
       return candidates.first.email;
     }
@@ -356,9 +338,8 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     if (!silent) {
       setState(() {
         _isSuccess = false;
-        _statusMessage = widget.type == BiometricType.fingerprint
-            ? 'Saisissez votre e-mail ou activez l\'empreinte dans votre profil après connexion.'
-            : 'Saisissez votre e-mail ou configurez Face ID dans votre profil après connexion.';
+        _statusMessage =
+            'Saisissez votre e-mail ou configurez Face ID dans votre profil après connexion.';
       });
       _animController.stop();
     }
@@ -385,9 +366,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
           _isVerifying = false;
           _isSuccess = false;
           _statusMessage = context.auth.errorMessage ??
-              (widget.type == BiometricType.fingerprint
-                  ? 'Connexion par empreinte impossible. Utilisez votre mot de passe.'
-                  : 'Connexion Face ID impossible. Utilisez votre mot de passe.');
+              'Connexion Face ID impossible. Utilisez votre mot de passe.';
         });
         _animController.stop();
         return;
@@ -635,9 +614,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
 
                   // ── Titre ──────────────────────────────────────────────────
                   Text(
-                    widget.type == BiometricType.fingerprint
-                        ? 'Empreinte Digitale'
-                        : 'Reconnaissance Faciale Face ID',
+                    'Reconnaissance Faciale Face ID',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 22,
@@ -711,7 +688,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                   const SizedBox(height: 24),
 
                   // ── Boutons d'action biométriques ─────────────────────────
-                  if (widget.type == BiometricType.face && _usesNativeBiometrics) ...[
+                  if (_usesNativeBiometrics) ...[
                     AppButton(
                       label: _isSuccess == true
                           ? 'Visage validé'
@@ -727,27 +704,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                     const SizedBox(height: 10),
                     AppButton.secondary(
                       label: 'Capteur du téléphone',
-                      icon: Icons.fingerprint_rounded,
-                      onPressed: (_isVerifying || _isSuccess == true)
-                          ? null
-                          : _authenticateWithDevice,
-                    ),
-                    const SizedBox(height: 12),
-                  ] else if (widget.type == BiometricType.fingerprint || _usesNativeBiometrics) ...[
-                    AppButton(
-                      label: _isSuccess == true
-                          ? (widget.type == BiometricType.fingerprint
-                              ? 'Empreinte validée'
-                              : 'Visage validé')
-                          : _isVerifying
-                              ? 'Analyse en cours...'
-                              : (widget.type == BiometricType.fingerprint
-                                  ? 'Scanner mon empreinte'
-                                  : 'Scanner mon visage'),
-                      icon: widget.type == BiometricType.fingerprint
-                          ? Icons.fingerprint_rounded
-                          : Icons.face_retouching_natural_rounded,
-                      isLoading: _isVerifying,
+                      icon: Icons.face_retouching_natural_rounded,
                       onPressed: (_isVerifying || _isSuccess == true)
                           ? null
                           : _authenticateWithDevice,
@@ -859,10 +816,6 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
 
   /// Scanner biométrique facial moderne avec caméra intégrée et laser animé
   Widget _buildFaceCameraWidget(Color glowColor) {
-    // Pour l'empreinte digitale : affichage d'un widget dédié sans caméra
-    if (widget.type == BiometricType.fingerprint) {
-      return _buildFingerprintWidget(glowColor);
-    }
     return Container(
       width: 230,
       height: 280,

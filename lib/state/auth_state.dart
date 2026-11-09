@@ -456,9 +456,6 @@ class AuthState extends ChangeNotifier {
 
     if (user == null) {
       final candidates = userState.allUsers.where((u) {
-        if (type == BiometricType.fingerprint) {
-          return u.biometricFingerprintEnabled;
-        }
         return u.biometricFaceEnabled || u.hasFaceRegistered;
       });
       if (candidates.isNotEmpty) {
@@ -469,31 +466,19 @@ class AuthState extends ChangeNotifier {
     if (user == null) {
       _errorMessage = (effectiveEmail != null && effectiveEmail.isNotEmpty)
           ? "Profil introuvable pour $effectiveEmail. Connectez-vous d'abord avec votre mot de passe."
-          : (type == BiometricType.fingerprint
-              ? "Aucun profil avec empreinte digitale configurée."
-              : "Aucun profil configuré pour cette biométrie.");
+          : "Aucun profil configuré pour cette biométrie.";
       _isLoading = false;
       notifyListeners();
       return false;
     }
 
     // Sécurité : vérification que la biométrie demandée est bien activée
-    if (type == BiometricType.fingerprint) {
-      if (!user.biometricFingerprintEnabled) {
-        _errorMessage =
-            "L'empreinte digitale n'est pas activée pour ce compte. Activez-la dans votre profil ou paramètres.";
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-    } else {
-      if (!user.hasFaceRegistered && !user.biometricFaceEnabled) {
-        _errorMessage =
-            "Aucun visage n'est enregistré pour ce compte. Activez Face ID dans les paramètres.";
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
+    if (!user.hasFaceRegistered && !user.biometricFaceEnabled) {
+      _errorMessage =
+          "Aucun visage n'est enregistré pour ce compte. Activez Face ID dans les paramètres.";
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
 
     if (user.isSuspended) {

@@ -32,7 +32,7 @@ enum BiometricAuthResult {
 ///   (`FaceRecognitionService`) : [authenticate] confirme simplement que la
 ///   comparaison 128D a déjà réussi.
 /// - Sur Android / iOS, on délègue au capteur biométrique natif du téléphone
-///   (Face ID, Face Unlock, empreinte) via `local_auth`.
+///   (Face ID, Face Unlock) via `local_auth`.
 class MockBiometricService {
   /// Marqueur stocké dans `face_embedding` lorsqu'un appareil mobile utilise
   /// la biométrie native (il n'y a pas d'embedding 128D à calculer).
@@ -114,7 +114,7 @@ class MockBiometricService {
     }
   }
 
-  /// Mémorise localement le profil lié au Face ID ou à l'empreinte de cet appareil.
+  /// Mémorise localement le profil lié au Face ID de cet appareil.
   Future<void> cacheBoundProfile(AppUser user) async {
     if (kIsWeb) return;
     try {
@@ -277,7 +277,7 @@ class MockBiometricService {
       case BiometricAuthResult.canceled:
         return 'Authentification biométrique annulée.';
       case BiometricAuthResult.notEnrolled:
-        return 'Aucune biométrie n\'est configurée sur cet appareil. Ajoutez un visage ou une empreinte dans les réglages du téléphone.';
+        return 'Aucune biométrie n\'est configurée sur cet appareil. Ajoutez un visage dans les réglages du téléphone.';
       case BiometricAuthResult.unavailable:
         return 'La biométrie n\'est pas disponible sur cet appareil.';
     }

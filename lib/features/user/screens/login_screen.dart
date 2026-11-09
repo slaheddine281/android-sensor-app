@@ -346,15 +346,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       label: 'Connexion sécurisée Face ID',
                       onPressed: () => _handleBiometricLogin(BiometricType.face),
                     ),
-                    const SizedBox(height: 10),
-
-                    // Connexion Empreinte digitale
-                    BiometricQuickButton(
-                      icon: Icons.fingerprint_rounded,
-                      label: 'Connexion par empreinte digitale',
-                      onPressed: () =>
-                          _handleBiometricLogin(BiometricType.fingerprint),
-                    ),
                     const SizedBox(height: 24),
 
                     // Register link

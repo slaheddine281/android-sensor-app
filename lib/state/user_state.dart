@@ -22,8 +22,6 @@ class UserState extends ChangeNotifier {
       _users.where((u) => u.role == UserRole.admin).length;
   int get faceIdUsersCount =>
       _users.where((u) => u.biometricFaceEnabled || u.hasFaceRegistered).length;
-  int get fingerprintUsersCount =>
-      _users.where((u) => u.biometricFingerprintEnabled).length;
 
   SupabaseClient? get _supabase => SupabaseConstants.client;
 

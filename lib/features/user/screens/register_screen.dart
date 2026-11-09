@@ -94,7 +94,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
 
-      // Onboarding Face ID (l'empreinte digitale est supprimée)
+      // Onboarding Face ID
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => const BiometricSetupScreen(isInitialOnboarding: true),
