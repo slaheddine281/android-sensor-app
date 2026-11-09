@@ -89,11 +89,19 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (result == true && mounted) {
-      if (context.auth.isAuthenticated) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const UserHomeScreen()),
+      final user = context.auth.currentUser;
+      if (user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Bienvenue, ${user.fullName} !'),
+            backgroundColor: AppColors.secondary,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const UserHomeScreen()),
+      );
     }
   }
 

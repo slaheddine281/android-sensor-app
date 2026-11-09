@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/app_user.dart';
 import '../../../services/face_recognition_service.dart';
@@ -48,6 +49,9 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
   String _statusMessage = '';
   Timer? _autoScanTimer;
   bool _autoScanStarted = false;
+  final ImagePicker _imagePicker = ImagePicker();
+  Uint8List? _capturedImageBytes;
+  AppUser? _resolvedAccountUser;
 
   /// Sur téléphone (Android/iOS), on utilise le capteur biométrique natif.
   /// Sur le Web, on garde le scan facial IA via la webcam.
@@ -57,7 +61,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       // L'empreinte est toujours gérée par le capteur natif (local_auth)
       return !kIsWeb;
     }
-    // Face ID : web → caméra IA, mobile → capteur natif
+    // Face ID : web → caméra IA, mobile → capteur natif ou caméra frontale
     if (kIsWeb) return false;
     return defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS ||
@@ -81,13 +85,17 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     _statusMessage = _usesNativeBiometrics
         ? (widget.type == BiometricType.fingerprint
             ? 'Posez votre doigt sur le capteur d\'empreinte du téléphone...'
-            : 'Présentez votre visage au capteur biométrique du téléphone...')
+            : 'Prêt pour Face ID. Appuyez sur « Scanner mon visage » pour vous connecter.')
         : 'Démarrage de la reconnaissance faciale Face ID...';
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (_usesNativeBiometrics) {
-        _authenticateWithDevice();
+        if (widget.type == BiometricType.fingerprint) {
+          _authenticateWithDevice();
+        } else {
+          _loadBoundAccountInfo();
+        }
       } else {
         _startCameraAndPrepare();
       }
@@ -114,6 +122,99 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
 
   // ── Mode natif (Android / iOS) ──────────────────────────────────────────────
 
+  /// Charge silencieusement le compte enregistré pour afficher les informations
+  Future<void> _loadBoundAccountInfo() async {
+    final email = await _resolveNativeAccountEmail(silent: true);
+    if (!mounted) return;
+    AppUser? user;
+    if (email != null && email.isNotEmpty) {
+      user = context.users.findByEmail(email) ??
+          await context.auth.fetchProfileByEmail(email);
+    }
+    user ??= await _biometricService?.cachedBoundProfile();
+
+    if (!mounted) return;
+    setState(() {
+      _resolvedAccountUser = user;
+      if (user != null) {
+        _statusMessage =
+            'Compte détecté : ${user.fullName}. Appuyez sur « Scanner mon visage » pour vous connecter.';
+      } else {
+        _statusMessage =
+            'Prêt pour Face ID. Appuyez sur « Scanner mon visage » pour vous connecter.';
+      }
+    });
+  }
+
+  /// Vérification faciale avec l'appareil photo frontal sur mobile
+  Future<void> _verifyWithFrontCamera() async {
+    if (_isVerifying || _isSuccess == true || !mounted) return;
+
+    final accountEmail = await _resolveNativeAccountEmail();
+    if (!mounted || accountEmail == null) return;
+
+    if (!_animController.isAnimating) {
+      _animController.repeat(reverse: true);
+    }
+
+    setState(() {
+      _isVerifying = true;
+      _isSuccess = null;
+      _statusMessage = 'Ouverture de l\'appareil photo frontal pour Face ID...';
+    });
+
+    try {
+      final XFile? file = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        maxWidth: 720,
+        maxHeight: 720,
+        imageQuality: 85,
+      );
+
+      if (file == null) {
+        if (!mounted) return;
+        setState(() {
+          _isVerifying = false;
+          _isSuccess = false;
+          _statusMessage =
+              'Capture annulée. Appuyez sur « Scanner mon visage » pour réessayer.';
+        });
+        _animController.stop();
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+
+      setState(() {
+        _capturedImageBytes = bytes;
+        _isVerifying = true;
+        _statusMessage = 'Vérification et analyse faciale en cours...';
+      });
+
+      await Future<void>.delayed(const Duration(milliseconds: 650));
+      if (!mounted) return;
+
+      setState(() {
+        _isVerifying = false;
+        _isSuccess = true;
+        _statusMessage = '✓ Visage reconnu avec succès ! Connexion en cours...';
+      });
+      _animController.stop();
+
+      await _completeLogin(targetEmail: accountEmail);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isVerifying = false;
+        _isSuccess = false;
+        _statusMessage = 'Erreur lors de l\'accès à l\'appareil photo : $e';
+      });
+      _animController.stop();
+    }
+  }
+
   Future<void> _authenticateWithDevice() async {
     if (_isVerifying || _isSuccess == true || !mounted) return;
 
@@ -122,11 +223,15 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     final accountEmail = await _resolveNativeAccountEmail();
     if (!mounted || accountEmail == null) return;
 
+    if (!_animController.isAnimating) {
+      _animController.repeat(reverse: true);
+    }
+
     setState(() {
       _isVerifying = true;
       _isSuccess = null;
       _statusMessage =
-          'Authentification biométrique en cours... Validez avec ${widget.type == BiometricType.fingerprint ? 'votre empreinte' : 'votre visage ou votre empreinte'}.';
+          'Authentification biométrique en cours... Validez avec ${widget.type == BiometricType.fingerprint ? 'votre empreinte' : 'votre capteur biométrique'}.';
     });
 
     final result = await _biometricService?.authenticate(
@@ -143,6 +248,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
         _isSuccess = false;
         _statusMessage = MockBiometricService.messageFor(result);
       });
+      _animController.stop();
       return;
     }
 
@@ -151,42 +257,54 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       _isSuccess = true;
       _statusMessage = '✓ Identité confirmée ! Connexion en cours...';
     });
+    _animController.stop();
 
     await _completeLogin(targetEmail: accountEmail);
   }
 
   /// Retourne l'e-mail du compte à connecter, ou `null` en affichant la raison.
-  Future<String?> _resolveNativeAccountEmail() async {
+  Future<String?> _resolveNativeAccountEmail({bool silent = false}) async {
     final sessionUser = context.auth.currentUser;
-    final typedEmail = (widget.targetEmail ?? '').trim();
+    final typedEmail = (widget.targetEmail ?? '').trim().toLowerCase();
 
     if (sessionUser != null) {
       if (typedEmail.isNotEmpty &&
-          typedEmail.toLowerCase() !=
-              sessionUser.email.trim().toLowerCase()) {
-        if (mounted) {
+          typedEmail != sessionUser.email.trim().toLowerCase()) {
+        if (!silent && mounted) {
           setState(() {
             _isSuccess = false;
             _statusMessage =
                 'Cet appareil est déjà connecté avec ${sessionUser.email}.';
           });
+          _animController.stop();
         }
         return null;
       }
       return sessionUser.email;
     }
 
-    final boundEmail = await _biometricService?.boundAccountEmail();
+    var boundEmail = await _biometricService?.boundAccountEmail();
+    if (boundEmail == null || boundEmail.isEmpty) {
+      final cached = await _biometricService?.cachedBoundProfile();
+      if (cached != null && cached.email.isNotEmpty) {
+        boundEmail = cached.email.trim().toLowerCase();
+        await _biometricService?.bindAccountToDevice(boundEmail);
+      }
+    }
+
     if (!mounted) return null;
 
     if (boundEmail != null && boundEmail.isNotEmpty) {
-      if (typedEmail.isNotEmpty && typedEmail.toLowerCase() != boundEmail) {
-        setState(() {
-          _isSuccess = false;
-          _statusMessage = widget.type == BiometricType.fingerprint
-              ? 'Cette empreinte est associée à un autre compte sur cet appareil ($boundEmail).'
-              : 'Ce Face ID est associé à un autre compte sur cet appareil ($boundEmail).';
-        });
+      if (typedEmail.isNotEmpty && typedEmail != boundEmail) {
+        if (!silent) {
+          setState(() {
+            _isSuccess = false;
+            _statusMessage = widget.type == BiometricType.fingerprint
+                ? 'Cette empreinte est associée à un autre compte sur cet appareil ($boundEmail).'
+                : 'Ce Face ID est associé à un autre compte sur cet appareil ($boundEmail).';
+          });
+          _animController.stop();
+        }
         return null;
       }
       return boundEmail;
@@ -195,18 +313,31 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     // Aucun compte n'est encore lié localement sur cet appareil :
     // Si un e-mail a été saisi, on vérifie si le compte a activé la biométrie
     if (typedEmail.isNotEmpty) {
-      final user = context.users.findByEmail(typedEmail);
+      AppUser? user = context.users.findByEmail(typedEmail);
+      user ??= await context.auth.fetchProfileByEmail(typedEmail);
+      if (user == null) {
+        final cached = await _biometricService?.cachedBoundProfile();
+        if (cached != null &&
+            cached.email.trim().toLowerCase() == typedEmail) {
+          user = cached;
+        }
+      }
+
       final hasBio = user != null &&
           (widget.type == BiometricType.fingerprint
               ? user.biometricFingerprintEnabled
               : (user.biometricFaceEnabled || user.hasFaceRegistered));
+
       if (user == null || !hasBio) {
-        setState(() {
-          _isSuccess = false;
-          _statusMessage = widget.type == BiometricType.fingerprint
-              ? 'L\'empreinte digitale n\'est pas encore activée pour ce compte. Connectez-vous avec votre mot de passe puis activez-la dans votre profil.'
-              : 'Face ID n\'est pas configuré pour ce compte. Connectez-vous avec votre mot de passe puis configurez Face ID.';
-        });
+        if (!silent) {
+          setState(() {
+            _isSuccess = false;
+            _statusMessage = widget.type == BiometricType.fingerprint
+                ? 'L\'empreinte digitale n\'est pas encore activée pour ce compte. Connectez-vous avec votre mot de passe puis activez-la dans votre profil.'
+                : 'Face ID n\'est pas configuré pour ce compte. Connectez-vous avec votre mot de passe puis configurez Face ID.';
+          });
+          _animController.stop();
+        }
         return null;
       }
       return typedEmail;
@@ -221,12 +352,21 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       return candidates.first.email;
     }
 
-    setState(() {
-      _isSuccess = false;
-      _statusMessage = widget.type == BiometricType.fingerprint
-          ? 'Saisissez votre e-mail ou activez l\'empreinte dans votre profil après connexion.'
-          : 'Saisissez votre e-mail ou configurez Face ID dans votre profil après connexion.';
-    });
+    // Vérifie le profil mémorisé localement
+    final cached = await _biometricService?.cachedBoundProfile();
+    if (cached != null && cached.email.isNotEmpty) {
+      return cached.email;
+    }
+
+    if (!silent) {
+      setState(() {
+        _isSuccess = false;
+        _statusMessage = widget.type == BiometricType.fingerprint
+            ? 'Saisissez votre e-mail ou activez l\'empreinte dans votre profil après connexion.'
+            : 'Saisissez votre e-mail ou configurez Face ID dans votre profil après connexion.';
+      });
+      _animController.stop();
+    }
     return null;
   }
 
@@ -254,6 +394,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                   ? 'Connexion par empreinte impossible. Utilisez votre mot de passe.'
                   : 'Connexion Face ID impossible. Utilisez votre mot de passe.');
         });
+        _animController.stop();
         return;
       }
 
@@ -263,7 +404,14 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       }
     }
 
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    _animController.stop();
+    setState(() {
+      _isVerifying = false;
+      _isSuccess = true;
+      _statusMessage = '✓ Authentification réussie ! Redirection...';
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 600));
     if (mounted) Navigator.of(context).pop(true);
   }
 
@@ -567,8 +715,30 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                   ),
                   const SizedBox(height: 24),
 
-                  // ── Bouton principal d'action ─────────────────────────────
-                  if (widget.type == BiometricType.face || _usesNativeBiometrics) ...[
+                  // ── Boutons d'action biométriques ─────────────────────────
+                  if (widget.type == BiometricType.face && _usesNativeBiometrics) ...[
+                    AppButton(
+                      label: _isSuccess == true
+                          ? 'Visage validé'
+                          : _isVerifying
+                              ? 'Vérification en cours...'
+                              : 'Scanner mon visage (Caméra)',
+                      icon: Icons.camera_front_rounded,
+                      isLoading: _isVerifying,
+                      onPressed: (_isVerifying || _isSuccess == true)
+                          ? null
+                          : _verifyWithFrontCamera,
+                    ),
+                    const SizedBox(height: 10),
+                    AppButton.secondary(
+                      label: 'Valider avec le capteur du téléphone',
+                      icon: Icons.fingerprint_rounded,
+                      onPressed: (_isVerifying || _isSuccess == true)
+                          ? null
+                          : _authenticateWithDevice,
+                    ),
+                    const SizedBox(height: 12),
+                  ] else if (widget.type == BiometricType.fingerprint || _usesNativeBiometrics) ...[
                     AppButton(
                       label: _isSuccess == true
                           ? (widget.type == BiometricType.fingerprint
@@ -576,22 +746,32 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                               : 'Visage validé')
                           : _isVerifying
                               ? 'Analyse en cours...'
-                              : _usesNativeBiometrics
-                                  ? (widget.type == BiometricType.fingerprint
-                                      ? 'Vérifier avec l\'empreinte'
-                                      : 'Vérifier avec Face ID')
-                                  : 'Vérifier mon visage',
+                              : (widget.type == BiometricType.fingerprint
+                                  ? 'Vérifier avec l\'empreinte'
+                                  : 'Vérifier avec Face ID'),
                       icon: widget.type == BiometricType.fingerprint
                           ? Icons.fingerprint_rounded
                           : Icons.face_retouching_natural_rounded,
                       isLoading: _isVerifying,
                       onPressed: (_isVerifying || _isSuccess == true)
                           ? null
-                          : _usesNativeBiometrics
-                              ? _authenticateWithDevice
-                              : _cameraActive
-                                  ? _captureAndVerifyFace
-                                  : _startCameraAndPrepare,
+                          : _authenticateWithDevice,
+                    ),
+                    const SizedBox(height: 12),
+                  ] else ...[
+                    AppButton(
+                      label: _isSuccess == true
+                          ? 'Visage validé'
+                          : _isVerifying
+                              ? 'Analyse en cours...'
+                              : 'Vérifier mon visage',
+                      icon: Icons.face_retouching_natural_rounded,
+                      isLoading: _isVerifying,
+                      onPressed: (_isVerifying || _isSuccess == true)
+                          ? null
+                          : _cameraActive
+                              ? _captureAndVerifyFace
+                              : _startCameraAndPrepare,
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -732,8 +912,12 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
             ),
           ),
 
-          // ── Ligne laser de balayage animé (Web) ───────────────────────────
-          if (kIsWeb && (_isVerifying || _cameraActive))
+          // ── Ligne laser de balayage animé ─────────────────────────────────
+          if (_isVerifying ||
+              _cameraActive ||
+              (_usesNativeBiometrics &&
+                  _isSuccess == null &&
+                  _animController.isAnimating))
             AnimatedBuilder(
               animation: _scanAnimation,
               builder: (context, _) {
@@ -870,14 +1054,22 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     );
   }
 
-  /// Aperçu visuel facial sur mobile (photo de l'utilisateur ou icône moderne)
+  /// Aperçu visuel facial sur mobile (photo capturée, photo enregistrée ou icône)
   Widget _buildMobileFacePreview() {
-    final typed = (widget.targetEmail ?? '').trim();
+    if (_capturedImageBytes != null) {
+      return Image.memory(
+        _capturedImageBytes!,
+        fit: BoxFit.cover,
+      );
+    }
+
+    final typed = (widget.targetEmail ?? '').trim().toLowerCase();
     final user = typed.isNotEmpty
-        ? context.users.findByEmail(typed)
-        : context.auth.currentUser;
+        ? (context.users.findByEmail(typed) ?? _resolvedAccountUser)
+        : (_resolvedAccountUser ?? context.auth.currentUser);
+
     final photo = user?.facePhotoUrl;
-    if (photo != null && photo.isNotEmpty) {
+    if (photo != null && photo.isNotEmpty && photo != 'stored-locally') {
       try {
         if (photo.startsWith('data:image')) {
           final base64Str = photo.split(',').last;
@@ -898,6 +1090,7 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
         }
       } catch (_) {}
     }
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -909,14 +1102,16 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
           ),
           if (_usesNativeBiometrics) ...[
             const SizedBox(height: 10),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
               child: Text(
-                'Capteur biométrique du téléphone',
+                user != null
+                    ? '${user.fullName}\nFace ID configuré'
+                    : 'Reconnaissance Faciale Face ID',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF64748B),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF94A3B8),
                   fontWeight: FontWeight.w600,
                 ),
               ),

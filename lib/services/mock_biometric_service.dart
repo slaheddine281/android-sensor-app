@@ -45,6 +45,9 @@ class MockBiometricService {
   /// sans session Supabase active (après redémarrage de l'application).
   static const String _cachedProfileKey = 'stepquest.face_id.bound_profile';
 
+  /// Clé séparée pour stocker la photo faciale sans alourdir le JSON du profil.
+  static const String _photoKey = 'stepquest.face_id.photo';
+
   final LocalAuthentication _localAuth = LocalAuthentication();
 
   bool _hardwareSupported = true;
@@ -105,6 +108,7 @@ class MockBiometricService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_boundAccountKey);
       await prefs.remove(_cachedProfileKey);
+      await prefs.remove(_photoKey);
     } catch (_) {
       // Rien à faire : l'état serveur reste la source de vérité.
     }
@@ -115,9 +119,18 @@ class MockBiometricService {
     if (kIsWeb) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cachedProfileKey, jsonEncode(user.toMap()));
-    } catch (_) {
-      // Cache facultatif : la connexion Supabase reste prioritaire.
+      final map = user.toMap();
+      final photo = user.facePhotoUrl;
+      if (photo != null && photo.isNotEmpty) {
+        // Enregistre la photo sous une clé dédiée
+        await prefs.setString(_photoKey, photo);
+        // Garde le JSON du profil léger et fiable
+        map['face_photo_url'] = 'stored-locally';
+        map['facePhotoUrl'] = 'stored-locally';
+      }
+      await prefs.setString(_cachedProfileKey, jsonEncode(map));
+    } catch (e) {
+      debugPrint('cacheBoundProfile error: $e');
     }
   }
 
@@ -129,9 +142,16 @@ class MockBiometricService {
       final raw = prefs.getString(_cachedProfileKey);
       if (raw == null || raw.trim().isEmpty) return null;
       final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) return null;
-      return AppUser.fromMap(decoded);
-    } catch (_) {
+      if (decoded is! Map) return null;
+      final map = Map<String, dynamic>.from(decoded);
+      final user = AppUser.fromMap(map);
+      final photo = prefs.getString(_photoKey);
+      if (photo != null && photo.isNotEmpty) {
+        return user.copyWith(facePhotoUrl: photo);
+      }
+      return user;
+    } catch (e) {
+      debugPrint('cachedBoundProfile error: $e');
       return null;
     }
   }

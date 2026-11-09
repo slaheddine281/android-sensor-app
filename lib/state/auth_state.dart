@@ -61,7 +61,7 @@ class AuthState extends ChangeNotifier {
 
   /// Fetch a profile row from public.profiles by e-mail (Face ID login when
   /// no Supabase session and the local user list is still empty).
-  Future<AppUser?> _fetchProfileByEmail(String email) async {
+  Future<AppUser?> fetchProfileByEmail(String email) async {
     final sb = _supabase;
     if (sb == null) return null;
     try {
@@ -73,7 +73,7 @@ class AuthState extends ChangeNotifier {
       if (data == null) return null;
       return AppUser.fromMap(data);
     } catch (e) {
-      debugPrint('_fetchProfileByEmail error: $e');
+      debugPrint('fetchProfileByEmail error: $e');
       return null;
     }
   }
@@ -421,23 +421,26 @@ class AuthState extends ChangeNotifier {
       }
     }
 
-    if (user == null && targetEmail != null && targetEmail.trim().isNotEmpty) {
-      user = userState.findByEmail(targetEmail) ??
-          await _fetchProfileByEmail(targetEmail);
+    // Récupère l'e-mail lié à cet appareil si aucun e-mail n'a été spécifié
+    final boundEmail = await biometricService.boundAccountEmail();
+    final effectiveEmail = (targetEmail != null && targetEmail.trim().isNotEmpty)
+        ? targetEmail.trim().toLowerCase()
+        : boundEmail?.trim().toLowerCase();
+
+    if (user == null && effectiveEmail != null && effectiveEmail.isNotEmpty) {
+      user = userState.findByEmail(effectiveEmail) ??
+          await fetchProfileByEmail(effectiveEmail);
     }
 
-    // Dernier recours (mobile) : restaure le profil enrôlé sur l'appareil
-    // lorsqu'aucune session Supabase n'est active (ex. après redémarrage).
+    // Restauration du profil local lié si Supabase n'est pas accessible sans session
     if (user == null && biometricService.isNativePlatform) {
-      final requested = targetEmail?.trim().toLowerCase() ?? '';
-      final boundEmail = await biometricService.boundAccountEmail();
       final cached = await biometricService.cachedBoundProfile();
-      if (cached != null &&
-          boundEmail != null &&
-          cached.email.trim().toLowerCase() == boundEmail &&
-          (requested.isEmpty ||
-              cached.email.trim().toLowerCase() == requested)) {
-        user = cached;
+      if (cached != null) {
+        if (effectiveEmail == null ||
+            effectiveEmail.isEmpty ||
+            cached.email.trim().toLowerCase() == effectiveEmail) {
+          user = cached;
+        }
       }
     }
 
@@ -454,8 +457,8 @@ class AuthState extends ChangeNotifier {
     }
 
     if (user == null) {
-      _errorMessage = (targetEmail != null && targetEmail.trim().isNotEmpty)
-          ? "Profil introuvable. Connectez-vous d'abord avec votre mot de passe."
+      _errorMessage = (effectiveEmail != null && effectiveEmail.isNotEmpty)
+          ? "Profil introuvable pour $effectiveEmail. Connectez-vous d'abord avec votre mot de passe."
           : (type == BiometricType.fingerprint
               ? "Aucun profil avec empreinte digitale configurée."
               : "Aucun profil configuré pour cette biométrie.");
