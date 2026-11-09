@@ -24,7 +24,7 @@ Bienvenue dans le dépôt officiel de **StepQuest**, une application moderne et 
 ## 🚀 Points Forts & Innovations Clés
 
 * **📸 Face ID IA en Temps Réel (Web)** : Modèle de deep learning embarqué dans le navigateur via `face-api.min.js` et pont JavaScript (`face_recognition_bridge.js`). Extraction d'un vecteur d'empreinte faciale de 128 dimensions, calcul de distance euclidienne et correspondance instantanée avec niveau de confiance (%).
-* **📱 Face ID Natif (Android / iOS)** : invite biométrique officielle du téléphone via `local_auth` (Face ID, Face Unlock, empreinte), liée au compte enrôlé sur l'appareil — aucun scan caméra bloqué, aucun enregistrement d'image.
+* **📱 Face ID Natif (Android / iOS)** : invite biométrique officielle du téléphone via `local_auth` (Face ID, Face Unlock), liée au compte enrôlé sur l'appareil — aucun scan caméra bloqué, aucun enregistrement d'image.
 * **🚫 Zéro Empreinte Digitale** : Abandon complet de l'empreinte digitale mockée au profit exclusif de la reconnaissance faciale Face ID native et moderne.
 * **🛡️ Backend Supabase Robuste** : Inscription, connexion, mise à jour de profil et réinitialisation de mot de passe (`type=recovery`) synchronisés en temps réel avec PostgreSQL et politiques RLS (*Row Level Security*).
 * **✨ Splash Screen Pro Animé** : Halo lumineux néon pulsant en boucle (`AnimationController`), montée en échelle douce de l'emblème, badges technologiques animés et jauge de progression système.
@@ -121,7 +121,7 @@ Bienvenue dans le dépôt officiel de **StepQuest**, une application moderne et 
 
 19. **Authentification biométrique plein écran (`biometric_auth_screen.dart`)** :
     * **Web** : scanner Face ID haute précision avec flux caméra, visée en 4 coins, scan laser animé et comparaison temps réel du visage capturé avec l'embedding 128D stocké.
-    * **Android / iOS** : invite biométrique native du système (Face ID, Face Unlock ou empreinte) via `local_auth`, avec délai maximal et arrêt propre de la caméra pour éviter tout scan bloqué ou infini.
+    * **Android / iOS** : invite biométrique native du système (Face ID, Face Unlock) via `local_auth`, avec délai maximal et arrêt propre de la caméra pour éviter tout scan bloqué ou infini.
 20. **Centre de notifications (`notifications_screen.dart`)** :
     * Historique complet des événements du compte (Connexions, Enrôlement Face ID, Mises à jour de profil, Actions administrateurs).
     * Filtres par catégorie et bouton *Tout marquer comme lu*.
@@ -140,7 +140,7 @@ Dans les versions précédentes, une simulation d'empreinte digitale était pré
 3. **Reconnaissance à la connexion** : Lors du clic sur *"Connexion sécurisée Face ID"*, la caméra compare en temps réel le visage de l'utilisateur avec l'embedding enregistré via la distance euclidienne. Un score de similarité supérieur au seuil autorise instantanément la connexion.
 
 ### Sur Android / iOS — biométrie native du téléphone
-1. **Face ID / capteur système** : `local_auth` déclenche l'invite biométrique officielle du téléphone (Face ID, Face Unlock, empreinte). Aucune image ni vidéo du visage ne transite par l'application.
+1. **Face ID / capteur système** : `local_auth` déclenche l'invite biométrique officielle du téléphone (Face ID, Face Unlock). Aucune image ni vidéo du visage ne transite par l'application.
 2. **Liaison stricte au compte** : lors de l'enrôlement, l'e-mail du compte est associé localement à l'appareil (`shared_preferences`). La biométrie système prouvant seulement l'identité du propriétaire de l'appareil, cette liaison empêche de saisir l'e-mail d'un autre utilisateur puis de valider son propre doigt.
 3. **Aucun scan infini** : chaque ouverture de caméra et chaque scan possède un délai maximal, la caméra est arrêtée explicitement à la fermeture de l'écran, et le prompt natif ne se relance jamais tout seul après un échec.
 
