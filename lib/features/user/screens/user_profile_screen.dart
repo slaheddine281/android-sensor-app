@@ -8,6 +8,7 @@ import '../../../widgets/app_card.dart';
 import '../../../widgets/role_badge.dart';
 import '../../../widgets/status_badge.dart';
 import '../../../widgets/user_avatar.dart';
+import '../../admin/screens/admin_dashboard_screen.dart';
 import 'account_settings_screen.dart';
 import 'edit_profile_screen.dart';
 import 'face_enrollment_screen.dart';
@@ -187,6 +188,32 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       StatusBadge(status: user.status),
                     ],
                   ),
+                  if (user.isAdmin) ...[
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => const AdminDashboardScreen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      icon: const Icon(Icons.admin_panel_settings_rounded,
+                          size: 18),
+                      label: const Text('Tableau de bord Administrateur',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w700)),
+                    ),
+                  ],
                   const SizedBox(height: 20),
 
                   // Stats Row matching mockup Screen 07

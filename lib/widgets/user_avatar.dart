@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../core/theme/app_colors.dart';
 import '../models/app_user.dart';
@@ -10,6 +11,7 @@ class UserAvatar extends StatelessWidget {
   final bool showEditBadge;
   final VoidCallback? onEdit;
   final Color? borderColor;
+  final Uint8List? imageBytes;
 
   const UserAvatar({
     super.key,
@@ -19,6 +21,7 @@ class UserAvatar extends StatelessWidget {
     this.showEditBadge = false,
     this.onEdit,
     this.borderColor,
+    this.imageBytes,
   });
 
   String get _initials {
@@ -48,21 +51,43 @@ class UserAvatar extends StatelessWidget {
   }
 
   ImageProvider? get _imageProvider {
-    final facePhoto = user?.facePhotoUrl;
-    if (facePhoto != null && facePhoto.startsWith('data:image')) {
-      try {
-        final commaIdx = facePhoto.indexOf(',');
-        if (commaIdx != -1) {
-          final bytes = base64Decode(facePhoto.substring(commaIdx + 1));
-          return MemoryImage(bytes);
-        }
-      } catch (_) {}
+    if (imageBytes != null && imageBytes!.isNotEmpty) {
+      return MemoryImage(imageBytes!);
     }
 
+    // 1. Photo de profil choisie par l'utilisateur prioritaire
     final avatar = user?.avatarUrl;
-    if (avatar != null &&
-        (avatar.startsWith('http://') || avatar.startsWith('https://'))) {
-      return NetworkImage(avatar);
+    if (avatar != null && avatar.trim().isNotEmpty) {
+      if (avatar.startsWith('data:image')) {
+        try {
+          final commaIdx = avatar.indexOf(',');
+          if (commaIdx != -1) {
+            final bytes = base64Decode(avatar.substring(commaIdx + 1));
+            return MemoryImage(bytes);
+          }
+        } catch (_) {}
+      } else if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+        return NetworkImage(avatar);
+      }
+    }
+
+    // 2. Photo issue de Face ID (face_photo_url) en fallback si aucune photo définie
+    final facePhoto = user?.facePhotoUrl;
+    if (facePhoto != null &&
+        facePhoto.trim().isNotEmpty &&
+        facePhoto != 'stored-locally') {
+      if (facePhoto.startsWith('data:image')) {
+        try {
+          final commaIdx = facePhoto.indexOf(',');
+          if (commaIdx != -1) {
+            final bytes = base64Decode(facePhoto.substring(commaIdx + 1));
+            return MemoryImage(bytes);
+          }
+        } catch (_) {}
+      } else if (facePhoto.startsWith('http://') ||
+          facePhoto.startsWith('https://')) {
+        return NetworkImage(facePhoto);
+      }
     }
 
     return null;

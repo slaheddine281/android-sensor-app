@@ -665,7 +665,8 @@ class AuthState extends ChangeNotifier {
               'face_embedding': updatedUser.faceEmbedding,
               'face_photo_url': updatedUser.facePhotoUrl,
             })
-            .eq('id', updatedUser.id);
+            .eq('id', updatedUser.id)
+            .timeout(const Duration(seconds: 6));
       } catch (e) {
         debugPrint('updateCurrentProfile Supabase error: $e');
       }

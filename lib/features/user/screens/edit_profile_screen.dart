@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../state/app_state_provider.dart';
@@ -26,6 +29,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   DateTime? _selectedBirthDate;
   bool _isLoading = false;
   bool _isInitialized = false;
+
+  final ImagePicker _imagePicker = ImagePicker();
+  Uint8List? _newAvatarBytes;
+  String? _newAvatarBase64;
+  bool _avatarChanged = false;
 
   @override
   void initState() {
@@ -93,6 +101,132 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickProfilePhoto() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: isDark ? AppColors.navyCard : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final currentUser = context.auth.currentUser;
+        final hasPhoto = _newAvatarBytes != null ||
+            (currentUser?.avatarUrl != null &&
+                currentUser!.avatarUrl!.isNotEmpty);
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Modifier la photo de profil',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_rounded,
+                      color: AppColors.primary),
+                  title: Text(
+                    'Choisir depuis la galerie',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_rounded,
+                      color: AppColors.secondary),
+                  title: Text(
+                    'Prendre une photo',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+                ),
+                if (hasPhoto)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline_rounded,
+                        color: AppColors.error),
+                    title: const Text(
+                      'Supprimer la photo',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      setState(() {
+                        _newAvatarBytes = null;
+                        _newAvatarBase64 = '';
+                        _avatarChanged = true;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Photo retirée. Pensez à enregistrer pour valider.'),
+                          backgroundColor: AppColors.primary,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (source == null) return;
+
+    try {
+      final XFile? file = await _imagePicker.pickImage(
+        source: source,
+        preferredCameraDevice: CameraDevice.front,
+        maxWidth: 400,
+        maxHeight: 400,
+        imageQuality: 75,
+      );
+
+      if (file == null) return;
+
+      final bytes = await file.readAsBytes();
+      final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+
+      if (!mounted) return;
+      setState(() {
+        _newAvatarBytes = bytes;
+        _newAvatarBase64 = base64String;
+        _avatarChanged = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Photo sélectionnée ! Pensez à enregistrer pour valider.'),
+          backgroundColor: AppColors.secondary,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la sélection : $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -100,39 +234,61 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _isLoading = true;
     });
 
-    final currentUser = context.auth.currentUser ??
-        (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
-    if (currentUser == null) return;
+    try {
+      final currentUser = context.auth.currentUser ??
+          (context.users.allUsers.isNotEmpty ? context.users.allUsers.first : null);
+      if (currentUser == null) return;
 
-    final updated = currentUser.copyWith(
-      fullName: _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      birthDate: _selectedBirthDate,
-      heightCm: int.tryParse(_heightController.text.trim()) ?? 170,
-      weightKg: double.tryParse(_weightController.text.trim()) ?? 65.0,
-    );
+      String? effectiveAvatar = currentUser.avatarUrl;
+      if (_avatarChanged) {
+        effectiveAvatar = (_newAvatarBase64 != null && _newAvatarBase64!.isNotEmpty)
+            ? _newAvatarBase64
+            : null;
+      }
 
-    await context.auth.updateCurrentProfile(
-      updatedUser: updated,
-      userState: context.users,
-      notificationState: context.notifications,
-    );
+      final updated = currentUser.copyWith(
+        fullName: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        birthDate: _selectedBirthDate,
+        heightCm: int.tryParse(_heightController.text.trim()) ?? 170,
+        weightKg: double.tryParse(_weightController.text.trim()) ?? 65.0,
+        avatarUrl: effectiveAvatar,
+      );
 
-    if (!mounted) return;
+      await context.auth.updateCurrentProfile(
+        updatedUser: updated,
+        userState: context.users,
+        notificationState: context.notifications,
+      );
 
-    setState(() {
-      _isLoading = false;
-    });
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Profil mis à jour avec succès !'),
-        backgroundColor: AppColors.secondary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profil mis à jour avec succès !'),
+          backgroundColor: AppColors.secondary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
 
-    Navigator.of(context).pop();
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la mise à jour : $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -168,15 +324,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     name: _nameController.text,
                     radius: 46,
                     showEditBadge: true,
-                    onEdit: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              'Simulation : Sélection d\'une photo de profil depuis la galerie.'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
+                    imageBytes: _newAvatarBytes,
+                    onEdit: _pickProfilePhoto,
                   ),
                 ),
                 const SizedBox(height: 28),

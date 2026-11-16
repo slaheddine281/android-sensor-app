@@ -8,6 +8,7 @@ import '../../../widgets/metric_card.dart';
 import '../../../widgets/user_activity_chart.dart';
 import '../../shared/screens/notifications_screen.dart';
 import '../../user/screens/login_screen.dart';
+import '../../user/screens/user_home_screen.dart';
 import 'users_list_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -131,6 +132,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => const NotificationsScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.person_outline_rounded,
+                      color: AppColors.secondary, size: 20),
+                ),
+                title: Text('Consulter l\'Espace Utilisateur',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    )),
+                trailing: Icon(Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color:
+                        isDark ? AppColors.textMuted : AppColors.textSecondary),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const UserHomeScreen(),
                     ),
                   );
                 },

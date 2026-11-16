@@ -5,6 +5,7 @@ import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/app_text_field.dart';
 import '../../../widgets/stepquest_logo.dart';
+import '../../admin/screens/admin_dashboard_screen.dart';
 import '../../admin/screens/admin_login_screen.dart';
 import '../../shared/screens/biometric_auth_screen.dart';
 import 'forgot_password_screen.dart';
@@ -64,9 +65,25 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (success) {
+      final user = context.auth.currentUser!;
+      if (user.isAdmin) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Session administrateur ouverte (${user.fullName})'),
+            backgroundColor: AppColors.secondary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+        );
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Bienvenue, ${context.auth.currentUser!.fullName} !'),
+          content: Text('Bienvenue, ${user.fullName} !'),
           backgroundColor: AppColors.secondary,
           behavior: SnackBarBehavior.floating,
         ),
@@ -91,6 +108,21 @@ class _LoginScreenState extends State<LoginScreen> {
     if (result == true && mounted) {
       final user = context.auth.currentUser;
       if (user != null) {
+        if (user.isAdmin) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Session administrateur ouverte (${user.fullName})'),
+              backgroundColor: AppColors.secondary,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
+          );
+          return;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Bienvenue, ${user.fullName} !'),

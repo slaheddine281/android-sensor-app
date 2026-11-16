@@ -4,6 +4,7 @@ import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_bottom_navigation.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/user_avatar.dart';
+import '../../admin/screens/admin_dashboard_screen.dart';
 import '../../shared/screens/notifications_screen.dart';
 import 'account_settings_screen.dart';
 import 'biometric_setup_screen.dart';
@@ -135,6 +136,69 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 ],
               ),
               const SizedBox(height: 24),
+
+              if (user.isAdmin) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.admin_panel_settings_rounded,
+                          color: AppColors.primaryLight, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Compte Administrateur',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                            const Text(
+                              'Supervisez les utilisateurs et les statistiques.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const AdminDashboardScreen(),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primaryLight,
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text('Tableau de bord',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               // Level & Progress Card
               AppCard(
