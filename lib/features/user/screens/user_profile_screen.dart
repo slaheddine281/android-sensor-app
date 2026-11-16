@@ -310,11 +310,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Face ID enrollment button
+                  // Bouton principal : Modifier le profil
                   AppButton(
+                    label: 'Modifier mon profil',
+                    icon: Icons.edit_rounded,
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Gestion biométrique Face ID
+                  AppButton.secondary(
                     label: user.hasFaceRegistered
                         ? 'Gérer mon Face ID'
-                        : 'Activer la Reconnaissance Faciale (Face ID)',
+                        : 'Configurer Face ID',
                     icon: Icons.face_rounded,
                     onPressed: () async {
                       await Navigator.of(context).push(
@@ -327,33 +341,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Action Buttons
-                  AppButton.secondary(
-                    label: 'Modifier mon profil',
-                    icon: Icons.edit_outlined,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const EditProfileScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
-                  AppButton.secondary(
-                    label: 'Paramètres',
-                    icon: Icons.settings_outlined,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const AccountSettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10),
-
+                  // Déconnexion
                   AppButton.destructive(
                     label: 'Déconnexion',
                     icon: Icons.logout_rounded,

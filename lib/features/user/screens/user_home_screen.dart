@@ -8,7 +8,7 @@ import '../../admin/screens/admin_dashboard_screen.dart';
 import '../../shared/screens/notifications_screen.dart';
 import 'account_settings_screen.dart';
 import 'biometric_setup_screen.dart';
-import 'delete_account_screen.dart';
+import 'edit_profile_screen.dart';
 import 'user_profile_screen.dart';
 
 class UserHomeScreen extends StatefulWidget {
@@ -259,122 +259,59 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // Quick chips row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const UserProfileScreen(),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10, horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? const Color(0xFF0F172A)
-                                    : AppColors.background,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.person_outline,
-                                      size: 18, color: AppColors.primaryLight),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Profil',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: isDark ? Colors.white : AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Gérer vos infos',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                    // Résumé forme & morphologie utile (non redondant)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF0F172A)
+                            : AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildMiniStat(
+                            icon: Icons.height_rounded,
+                            label: 'Taille',
+                            value: '${user.heightCm ?? 170} cm',
+                            isDark: isDark,
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const AccountSettingsScreen(),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10, horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? const Color(0xFF0F172A)
-                                    : AppColors.background,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.tune_rounded,
-                                      size: 18, color: AppColors.primaryLight),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Paramètres',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: isDark ? Colors.white : AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Préférences & Sécurité',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                          Container(
+                            height: 28,
+                            width: 1,
+                            color: isDark ? const Color(0xFF334155) : AppColors.divider,
                           ),
-                        ),
-                      ],
+                          _buildMiniStat(
+                            icon: Icons.fitness_center_rounded,
+                            label: 'Poids',
+                            value: '${user.weightKg?.toStringAsFixed(0) ?? 65} kg',
+                            isDark: isDark,
+                          ),
+                          Container(
+                            height: 28,
+                            width: 1,
+                            color: isDark ? const Color(0xFF334155) : AppColors.divider,
+                          ),
+                          _buildMiniStat(
+                            icon: Icons.verified_user_outlined,
+                            label: 'Face ID',
+                            value: user.hasFaceRegistered ? 'Actif' : 'Inactif',
+                            valueColor: user.hasFaceRegistered
+                                ? AppColors.secondary
+                                : AppColors.textSecondary,
+                            isDark: isDark,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Section Accès Rapide matching Screen 06
+              // Section Accès Rapide avec actions ciblées (sans doublon avec la barre inférieure)
               Text(
                 'Accès rapide',
                 style: TextStyle(
@@ -386,25 +323,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               const SizedBox(height: 12),
 
               _buildQuickAccessTile(
-                icon: Icons.person_outline_rounded,
-                iconColor: AppColors.primaryLight,
-                title: 'Mon profil',
-                subtitle: 'Consulter et modifier mes informations',
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const UserProfileScreen(),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-
-              _buildQuickAccessTile(
-                icon: Icons.shield_outlined,
+                icon: Icons.face_rounded,
                 iconColor: AppColors.secondary,
-                title: 'Paramètres de sécurité',
-                subtitle: 'Reconnaissance Faciale Face ID',
+                title: 'Reconnaissance Faciale Face ID',
+                subtitle: user.hasFaceRegistered
+                    ? 'Gérer ou recalibrer votre scan facial'
+                    : 'Activer la connexion par visage',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -416,15 +340,29 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
               const SizedBox(height: 10),
 
               _buildQuickAccessTile(
-                icon: Icons.delete_outline_rounded,
-                iconColor: AppColors.error,
-                title: 'Supprimer mon compte',
-                subtitle: 'Zone de danger et clôture de session',
-                isDestructive: true,
+                icon: Icons.edit_note_rounded,
+                iconColor: AppColors.primaryLight,
+                title: 'Modifier mes mensurations',
+                subtitle: 'Mettre à jour taille, poids et profil',
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const DeleteAccountScreen(),
+                      builder: (_) => const EditProfileScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 10),
+
+              _buildQuickAccessTile(
+                icon: Icons.notifications_none_rounded,
+                iconColor: const Color(0xFFF59E0B),
+                title: 'Centre de notifications',
+                subtitle: 'Historique des alertes et connexions',
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
                     ),
                   );
                 },
@@ -438,6 +376,37 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
         onTap: _onBottomNavTapped,
         items: AppBottomNavigation.userNavItems,
       ),
+    );
+  }
+
+  Widget _buildMiniStat({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDark,
+    Color? valueColor,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: AppColors.primaryLight),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: valueColor ?? (isDark ? Colors.white : AppColors.textPrimary),
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 
