@@ -2,12 +2,10 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../services/mock_biometric_service.dart';
 import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_app_bar.dart';
 import '../../../widgets/app_button.dart';
 import '../../../widgets/app_card.dart';
-import '../../shared/screens/biometric_auth_screen.dart';
 import 'face_enrollment_screen.dart';
 import 'user_home_screen.dart';
 
@@ -25,7 +23,6 @@ class BiometricSetupScreen extends StatefulWidget {
 
 class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
   bool _faceEnabled = true;
-  bool _isSaving = false;
   bool _isInitialized = false;
 
   /// Sur téléphone, on s'appuie sur la biométrie native du système.
@@ -49,26 +46,15 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     }
   }
 
-  Future<void> _handleTestBiometrics() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const BiometricAuthScreen(
-          type: BiometricType.face,
-          isSimulationTestOnly: true,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleSavePreferences() async {
+  Future<void> _handleToggleFace(bool value) async {
     setState(() {
-      _isSaving = true;
+      _faceEnabled = value;
     });
 
     final currentUser = context.auth.currentUser;
     if (currentUser != null) {
       final updated = currentUser.copyWith(
-        biometricFaceEnabled: _faceEnabled,
+        biometricFaceEnabled: value,
       );
 
       await context.auth.updateCurrentProfile(
@@ -81,24 +67,72 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          value
+              ? 'Face ID activé avec succès.'
+              : 'Face ID désactivé.',
+        ),
+        backgroundColor: value ? AppColors.secondary : AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _handleDeleteFace() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer mon visage'),
+        content: const Text(
+          'Voulez-vous supprimer les données biométriques de votre visage ? Vous ne pourrez plus vous connecter avec Face ID.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Supprimer', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    final currentUser = context.auth.currentUser;
+    if (currentUser != null) {
+      final updated = currentUser.copyWith(
+        faceEmbedding: null,
+        biometricFaceEnabled: false,
+      );
+
+      await context.auth.updateCurrentProfile(
+        updatedUser: updated,
+        userState: context.users,
+        notificationState: context.notifications,
+      );
+
+      await context.biometrics.clearDeviceBinding();
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _faceEnabled = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Préférences biométriques enregistrées avec succès.'),
+        content: Text('Données Face ID supprimées avec succès.'),
         backgroundColor: AppColors.secondary,
         behavior: SnackBarBehavior.floating,
       ),
     );
-
-    setState(() {
-      _isSaving = false;
-    });
-
-    if (widget.isInitialOnboarding) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const UserHomeScreen()),
-      );
-    } else {
-      Navigator.of(context).pop();
-    }
   }
 
   @override
@@ -159,7 +193,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
               // Carte Face ID Principale
               AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                 child: Column(
                   children: [
                     Row(
@@ -185,7 +219,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Face ID IA',
+                                'Face ID',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -212,7 +246,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                     _faceEnabled
                                         ? (hasFaceRegistered
                                             ? (_usesNativeBiometrics
-                                                ? 'Face ID activé sur cet appareil'
+                                                ? 'Face ID actif'
                                                 : 'Modèle 128D configuré')
                                             : 'Visage non configuré')
                                         : 'Désactivé',
@@ -235,23 +269,19 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                           value: _faceEnabled,
                           activeThumbColor: AppColors.primary,
                           activeTrackColor: AppColors.primarySoft,
-                          onChanged: (val) {
-                            setState(() {
-                              _faceEnabled = val;
-                            });
-                          },
+                          onChanged: _handleToggleFace,
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
                     const Divider(),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
                     // Bouton Enrôlement / Scanner Visage
                     AppButton(
                       label: _usesNativeBiometrics
                           ? (hasFaceRegistered
-                              ? 'Mettre à jour Face ID'
+                              ? 'Mettre à jour mon Face ID'
                               : 'Activer Face ID')
                           : (hasFaceRegistered
                               ? 'Recalibrer / Mettre à jour mon visage'
@@ -268,6 +298,15 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                         if (mounted) setState(() {});
                       },
                     ),
+
+                    if (hasFaceRegistered) ...[
+                      const SizedBox(height: 10),
+                      AppButton.destructive(
+                        label: 'Supprimer mon visage enregistré',
+                        icon: Icons.delete_outline_rounded,
+                        onPressed: _handleDeleteFace,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -297,7 +336,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                     Expanded(
                       child: Text(
                         _usesNativeBiometrics
-                            ? 'StepQuest utilise le Face ID / capteur biométrique natif de votre téléphone. Aucune image de votre visage n\'est enregistrée ni partagée par l\'application.'
+                            ? 'StepQuest utilise le Face ID / capteur biométrique natif de votre téléphone. Aucune image de votre visage n\'est partagée.'
                             : 'StepQuest utilise un réseau neuronal pour générer une empreinte vectorielle 128D stockée de manière sécurisée. Vos données faciales ne sont jamais partagées.',
                         style: TextStyle(
                           fontSize: 13,
@@ -309,23 +348,6 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
-
-              // Tester Face ID
-              AppButton(
-                label: 'Tester le scanner Face ID',
-                icon: Icons.face_rounded,
-                onPressed: _handleTestBiometrics,
-              ),
-              const SizedBox(height: 12),
-
-              // Sauvegarder
-              AppButton.secondary(
-                label: 'Enregistrer les préférences',
-                isLoading: _isSaving,
-                onPressed: _handleSavePreferences,
-              ),
-              const SizedBox(height: 20),
             ],
           ),
         ),

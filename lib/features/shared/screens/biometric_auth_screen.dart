@@ -347,35 +347,33 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
   }
 
   Future<void> _completeLogin({String? targetEmail}) async {
-    if (!widget.isSimulationTestOnly) {
-      final emailToUse = (targetEmail ?? widget.targetEmail)?.trim();
-      final loggedIn = await context.auth.loginWithBiometrics(
-        type: widget.type,
-        userState: context.users,
-        notificationState: context.notifications,
-        biometricService: context.biometrics,
-        targetEmail: emailToUse,
-        // La biométrie a déjà été validée juste avant.
-        biometricVerified: true,
-      );
+    final emailToUse = (targetEmail ?? widget.targetEmail)?.trim();
+    final loggedIn = await context.auth.loginWithBiometrics(
+      type: widget.type,
+      userState: context.users,
+      notificationState: context.notifications,
+      biometricService: context.biometrics,
+      targetEmail: emailToUse,
+      // La biométrie a déjà été validée juste avant.
+      biometricVerified: true,
+    );
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      if (!loggedIn) {
-        setState(() {
-          _isVerifying = false;
-          _isSuccess = false;
-          _statusMessage = context.auth.errorMessage ??
-              'Connexion Face ID impossible. Utilisez votre mot de passe.';
-        });
-        _animController.stop();
-        return;
-      }
+    if (!loggedIn) {
+      setState(() {
+        _isVerifying = false;
+        _isSuccess = false;
+        _statusMessage = context.auth.errorMessage ??
+            'Connexion Face ID impossible. Utilisez votre mot de passe.';
+      });
+      _animController.stop();
+      return;
+    }
 
-      // Mémorise la liaison sur cet appareil pour les prochaines connexions
-      if (emailToUse != null && emailToUse.isNotEmpty) {
-        await _biometricService?.bindAccountToDevice(emailToUse);
-      }
+    // Mémorise la liaison sur cet appareil pour les prochaines connexions
+    if (emailToUse != null && emailToUse.isNotEmpty) {
+      await _biometricService?.bindAccountToDevice(emailToUse);
     }
 
     _animController.stop();
@@ -543,48 +541,6 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     }
   }
 
-  /// Simulation d'authentification pour les tests et l'onboarding
-  Future<void> _triggerSimulatedScan({required bool succeed}) async {
-    setState(() {
-      _isVerifying = true;
-      _isSuccess = null;
-      _statusMessage = 'Analyse biométrique faciale Face ID...';
-    });
-
-    await Future<void>.delayed(const Duration(milliseconds: 1000));
-    if (!mounted) return;
-
-    if (succeed) {
-      setState(() {
-        _isVerifying = false;
-        _isSuccess = true;
-        _statusMessage = 'Authentification biométrique réussie !';
-      });
-
-      if (!widget.isSimulationTestOnly) {
-        await context.auth.loginWithBiometrics(
-          type: widget.type,
-          userState: context.users,
-          notificationState: context.notifications,
-          biometricService: context.biometrics,
-          targetEmail: (widget.targetEmail ?? '').trim().isEmpty
-              ? null
-              : widget.targetEmail!.trim(),
-          biometricVerified: true,
-        );
-      }
-
-      await Future<void>.delayed(const Duration(milliseconds: 600));
-      if (mounted) Navigator.of(context).pop(true);
-    } else {
-      setState(() {
-        _isVerifying = false;
-        _isSuccess = false;
-        _statusMessage = 'Biométrie non reconnue. Veuillez réessayer.';
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     Color accentColor = AppColors.primary;
@@ -734,77 +690,6 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
                     icon: Icons.lock_outline_rounded,
                     onPressed: () => Navigator.of(context).pop(false),
                   ),
-
-                  // ── Section Simulation (visible UNIQUEMENT en mode test) ──
-                  if (widget.isSimulationTestOnly) ...[
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.navyCard,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFF334155)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'SIMULATION DE TEST',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF94A3B8),
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 10),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.check, size: 16),
-                                  label: const Text('Succès',
-                                      style: TextStyle(fontSize: 12)),
-                                  onPressed: _isVerifying
-                                      ? null
-                                      : () => _triggerSimulatedScan(succeed: true),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFFFCA5A5),
-                                    side: const BorderSide(
-                                        color: Color(0xFF64748B)),
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 10),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                  icon: const Icon(Icons.close, size: 16),
-                                  label: const Text('Échec',
-                                      style: TextStyle(fontSize: 12)),
-                                  onPressed: _isVerifying
-                                      ? null
-                                      : () => _triggerSimulatedScan(succeed: false),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
