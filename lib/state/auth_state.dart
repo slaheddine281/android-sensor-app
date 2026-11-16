@@ -456,7 +456,8 @@ class AuthState extends ChangeNotifier {
 
     if (user == null) {
       final candidates = userState.allUsers.where((u) {
-        return u.biometricFaceEnabled || u.hasFaceRegistered;
+        // Le toggle biometricFaceEnabled doit être à true ET le visage enregistré
+        return u.biometricFaceEnabled && u.hasFaceRegistered;
       });
       if (candidates.isNotEmpty) {
         user = candidates.first;

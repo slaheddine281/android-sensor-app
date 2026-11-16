@@ -1,7 +1,8 @@
-import 'package:flutter/foundation.dart'
+﻿import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../models/app_user.dart';
 import '../../../state/app_state_provider.dart';
 import '../../../widgets/app_app_bar.dart';
 import '../../../widgets/app_button.dart';
@@ -22,9 +23,6 @@ class BiometricSetupScreen extends StatefulWidget {
 }
 
 class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
-  bool _faceEnabled = true;
-  bool _isInitialized = false;
-
   /// Sur téléphone, on s'appuie sur la biométrie native du système.
   bool get _usesNativeBiometrics {
     if (kIsWeb) return false;
@@ -34,35 +32,27 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
         defaultTargetPlatform == TargetPlatform.windows;
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isInitialized) {
-      final user = context.auth.currentUser;
-      if (user != null) {
-        _faceEnabled = user.biometricFaceEnabled || user.hasFaceRegistered;
-      }
-      _isInitialized = true;
-    }
-  }
-
   Future<void> _handleToggleFace(bool value) async {
-    setState(() {
-      _faceEnabled = value;
-    });
-
     final currentUser = context.auth.currentUser;
-    if (currentUser != null) {
-      final updated = currentUser.copyWith(
-        biometricFaceEnabled: value,
-      );
+    if (currentUser == null) return;
 
-      await context.auth.updateCurrentProfile(
-        updatedUser: updated,
-        userState: context.users,
-        notificationState: context.notifications,
+    final AppUser updated;
+    if (!value) {
+      // Désactivation : effacer l'embedding ET le flag → hasFaceRegistered = false
+      updated = currentUser.copyWith(
+        biometricFaceEnabled: false,
+        faceEmbedding: null,
       );
+      await context.biometrics.clearDeviceBinding();
+    } else {
+      updated = currentUser.copyWith(biometricFaceEnabled: true);
     }
+
+    await context.auth.updateCurrentProfile(
+      updatedUser: updated,
+      userState: context.users,
+      notificationState: context.notifications,
+    );
 
     if (!mounted) return;
 
@@ -122,9 +112,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
 
     if (!mounted) return;
 
-    setState(() {
-      _faceEnabled = false;
-    });
+    setState(() {}); // Rebuild pour refléter le nouvel état du provider
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -140,6 +128,8 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentUser = context.auth.currentUser;
     final hasFaceRegistered = currentUser?.hasFaceRegistered == true;
+    // Lire l'état directement depuis le provider pour refléter la réalité
+    final faceEnabled = currentUser?.biometricFaceEnabled == true;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
@@ -233,9 +223,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                     width: 8,
                                     height: 8,
                                     decoration: BoxDecoration(
-                                      color: _faceEnabled && hasFaceRegistered
+                                      color: faceEnabled && hasFaceRegistered
                                           ? AppColors.secondary
-                                          : _faceEnabled
+                                          : faceEnabled
                                               ? const Color(0xFFF59E0B)
                                               : AppColors.textMuted,
                                       shape: BoxShape.circle,
@@ -243,7 +233,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    _faceEnabled
+                                    faceEnabled
                                         ? (hasFaceRegistered
                                             ? (_usesNativeBiometrics
                                                 ? 'Face ID actif'
@@ -253,9 +243,9 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: _faceEnabled && hasFaceRegistered
+                                      color: faceEnabled && hasFaceRegistered
                                           ? AppColors.secondary
-                                          : _faceEnabled
+                                          : faceEnabled
                                               ? const Color(0xFFF59E0B)
                                               : AppColors.textMuted,
                                     ),
@@ -266,7 +256,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                           ),
                         ),
                         Switch(
-                          value: _faceEnabled,
+                          value: faceEnabled,
                           activeThumbColor: AppColors.primary,
                           activeTrackColor: AppColors.primarySoft,
                           onChanged: _handleToggleFace,
@@ -355,3 +345,4 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     );
   }
 }
+

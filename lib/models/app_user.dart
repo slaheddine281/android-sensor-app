@@ -87,6 +87,9 @@ class AppUser {
     return parts.isNotEmpty ? parts.first : fullName;
   }
 
+  // Sentinel pour permettre de passer explicitement null à faceEmbedding
+  static const Object _unset = Object();
+
   AppUser copyWith({
     String? id,
     String? fullName,
@@ -98,7 +101,7 @@ class AppUser {
     DateTime? lastLoginAt,
     bool? biometricFingerprintEnabled,
     bool? biometricFaceEnabled,
-    String? faceEmbedding,
+    Object? faceEmbedding = _unset,
     String? facePhotoUrl,
     int? heightCm,
     double? weightKg,
@@ -118,7 +121,9 @@ class AppUser {
       biometricFingerprintEnabled:
           biometricFingerprintEnabled ?? this.biometricFingerprintEnabled,
       biometricFaceEnabled: biometricFaceEnabled ?? this.biometricFaceEnabled,
-      faceEmbedding: faceEmbedding ?? this.faceEmbedding,
+      faceEmbedding: identical(faceEmbedding, _unset)
+          ? this.faceEmbedding
+          : faceEmbedding as String?,
       facePhotoUrl: facePhotoUrl ?? this.facePhotoUrl,
       heightCm: heightCm ?? this.heightCm,
       weightKg: weightKg ?? this.weightKg,
