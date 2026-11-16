@@ -87,14 +87,14 @@ class AppUser {
     return parts.isNotEmpty ? parts.first : fullName;
   }
 
-  // Sentinel pour permettre de passer explicitement null à faceEmbedding
+  // Sentinel pour permettre de passer explicitement null aux champs optionnels
   static const Object _unset = Object();
 
   AppUser copyWith({
     String? id,
     String? fullName,
     String? email,
-    String? avatarUrl,
+    Object? avatarUrl = _unset,
     UserRole? role,
     UserStatus? status,
     DateTime? createdAt,
@@ -102,7 +102,7 @@ class AppUser {
     bool? biometricFingerprintEnabled,
     bool? biometricFaceEnabled,
     Object? faceEmbedding = _unset,
-    String? facePhotoUrl,
+    Object? facePhotoUrl = _unset,
     int? heightCm,
     double? weightKg,
     DateTime? birthDate,
@@ -113,7 +113,9 @@ class AppUser {
       id: id ?? this.id,
       fullName: fullName ?? this.fullName,
       email: email ?? this.email,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUrl: identical(avatarUrl, _unset)
+          ? this.avatarUrl
+          : avatarUrl as String?,
       role: role ?? this.role,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
@@ -124,7 +126,9 @@ class AppUser {
       faceEmbedding: identical(faceEmbedding, _unset)
           ? this.faceEmbedding
           : faceEmbedding as String?,
-      facePhotoUrl: facePhotoUrl ?? this.facePhotoUrl,
+      facePhotoUrl: identical(facePhotoUrl, _unset)
+          ? this.facePhotoUrl
+          : facePhotoUrl as String?,
       heightCm: heightCm ?? this.heightCm,
       weightKg: weightKg ?? this.weightKg,
       birthDate: birthDate ?? this.birthDate,

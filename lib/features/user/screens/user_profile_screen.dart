@@ -10,6 +10,7 @@ import '../../../widgets/status_badge.dart';
 import '../../../widgets/user_avatar.dart';
 import '../../admin/screens/admin_dashboard_screen.dart';
 import 'account_settings_screen.dart';
+import 'biometric_setup_screen.dart';
 import 'edit_profile_screen.dart';
 import 'face_enrollment_screen.dart';
 import 'login_screen.dart';
@@ -299,10 +300,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         _buildInfoRow(
                           icon: Icons.shield_outlined,
                           label: 'Sécurité Biométrique',
-                          value: (user.biometricFaceEnabled ||
+                          value: (user.biometricFaceEnabled &&
                                   user.hasFaceRegistered)
-                              ? 'Face ID configuré'
-                              : 'Désactivé',
+                              ? 'Face ID activé'
+                              : (user.hasFaceRegistered
+                                  ? 'Configuré (désactivé)'
+                                  : 'Non configuré'),
                           isDark: isDark,
                         ),
                       ],
@@ -324,7 +327,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Gestion biométrique Face ID
+                  // Gestion biométrique Face ID (redirige vers le panneau de gestion)
                   AppButton.secondary(
                     label: user.hasFaceRegistered
                         ? 'Gérer mon Face ID'
@@ -333,7 +336,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     onPressed: () async {
                       await Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const FaceEnrollmentScreen(),
+                          builder: (_) => const BiometricSetupScreen(),
                         ),
                       );
                       if (mounted) setState(() {});

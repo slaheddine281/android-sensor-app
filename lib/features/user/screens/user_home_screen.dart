@@ -297,8 +297,12 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                           _buildMiniStat(
                             icon: Icons.verified_user_outlined,
                             label: 'Face ID',
-                            value: user.hasFaceRegistered ? 'Actif' : 'Inactif',
-                            valueColor: user.hasFaceRegistered
+                            value: (user.biometricFaceEnabled &&
+                                    user.hasFaceRegistered)
+                                ? 'Actif'
+                                : 'Inactif',
+                            valueColor: (user.biometricFaceEnabled &&
+                                    user.hasFaceRegistered)
                                 ? AppColors.secondary
                                 : AppColors.textSecondary,
                             isDark: isDark,
@@ -326,7 +330,7 @@ class _UserHomeScreenState extends State<UserHomeScreen> {
                 icon: Icons.face_rounded,
                 iconColor: AppColors.secondary,
                 title: 'Reconnaissance Faciale Face ID',
-                subtitle: user.hasFaceRegistered
+                subtitle: (user.biometricFaceEnabled && user.hasFaceRegistered)
                     ? 'Gérer ou recalibrer votre scan facial'
                     : 'Activer la connexion par visage',
                 onTap: () {

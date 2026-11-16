@@ -362,8 +362,8 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     final currentUser = context.auth.currentUser;
     if (currentUser != null) {
       final updated = currentUser.copyWith(
-        faceEmbedding: '',
-        facePhotoUrl: '',
+        faceEmbedding: null,
+        facePhotoUrl: null,
         biometricFaceEnabled: false,
       );
 

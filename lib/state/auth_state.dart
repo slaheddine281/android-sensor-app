@@ -443,10 +443,6 @@ class AuthState extends ChangeNotifier {
           user = cached;
         } else if (user != null && matchesEmail) {
           user = user.copyWith(
-            biometricFingerprintEnabled: user.biometricFingerprintEnabled ||
-                cached.biometricFingerprintEnabled,
-            biometricFaceEnabled:
-                user.biometricFaceEnabled || cached.biometricFaceEnabled,
             faceEmbedding: user.faceEmbedding ?? cached.faceEmbedding,
             facePhotoUrl: user.facePhotoUrl ?? cached.facePhotoUrl,
           );
@@ -473,10 +469,11 @@ class AuthState extends ChangeNotifier {
       return false;
     }
 
-    // Sécurité : vérification que la biométrie demandée est bien activée
-    if (!user.hasFaceRegistered && !user.biometricFaceEnabled) {
-      _errorMessage =
-          "Aucun visage n'est enregistré pour ce compte. Activez Face ID dans les paramètres.";
+    // Sécurité : vérification que la biométrie demandée est bien configurée ET activée
+    if (!user.hasFaceRegistered || !user.biometricFaceEnabled) {
+      _errorMessage = !user.hasFaceRegistered
+          ? "Aucun visage n'est enregistré pour ce compte. Activez Face ID dans les paramètres."
+          : "Face ID est actuellement désactivé pour ce compte. Activez-le dans les paramètres ou connectez-vous avec votre mot de passe.";
       _isLoading = false;
       notifyListeners();
       return false;

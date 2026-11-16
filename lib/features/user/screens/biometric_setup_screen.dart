@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart'
+import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
@@ -36,16 +36,24 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     final currentUser = context.auth.currentUser;
     if (currentUser == null) return;
 
-    final AppUser updated;
-    if (!value) {
-      // Désactivation : effacer l'embedding ET le flag → hasFaceRegistered = false
-      updated = currentUser.copyWith(
-        biometricFaceEnabled: false,
-        faceEmbedding: null,
+    if (value && !currentUser.hasFaceRegistered) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez d\'abord enregistrer votre visage avec le bouton ci-dessous.'),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
+      return;
+    }
+
+    final updated = currentUser.copyWith(
+      biometricFaceEnabled: value,
+    );
+    if (!value) {
       await context.biometrics.clearDeviceBinding();
-    } else {
-      updated = currentUser.copyWith(biometricFaceEnabled: true);
+    } else if (currentUser.email.isNotEmpty) {
+      await context.biometrics.bindAccountToDevice(currentUser.email);
     }
 
     await context.auth.updateCurrentProfile(
@@ -98,6 +106,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     if (currentUser != null) {
       final updated = currentUser.copyWith(
         faceEmbedding: null,
+        facePhotoUrl: null,
         biometricFaceEnabled: false,
       );
 
@@ -128,8 +137,8 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currentUser = context.auth.currentUser;
     final hasFaceRegistered = currentUser?.hasFaceRegistered == true;
-    // Lire l'état directement depuis le provider pour refléter la réalité
-    final faceEnabled = currentUser?.biometricFaceEnabled == true;
+    // Face ID n'est actif que si un visage est enregistré ET le toggle est activé
+    final faceEnabled = hasFaceRegistered && (currentUser?.biometricFaceEnabled == true);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
@@ -223,31 +232,31 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                                     width: 8,
                                     height: 8,
                                     decoration: BoxDecoration(
-                                      color: faceEnabled && hasFaceRegistered
-                                          ? AppColors.secondary
-                                          : faceEnabled
-                                              ? const Color(0xFFF59E0B)
-                                              : AppColors.textMuted,
+                                      color: hasFaceRegistered
+                                          ? (faceEnabled
+                                              ? AppColors.secondary
+                                              : AppColors.textMuted)
+                                          : const Color(0xFFF59E0B),
                                       shape: BoxShape.circle,
                                     ),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    faceEnabled
-                                        ? (hasFaceRegistered
+                                    hasFaceRegistered
+                                        ? (faceEnabled
                                             ? (_usesNativeBiometrics
                                                 ? 'Face ID actif'
-                                                : 'Modèle 128D configuré')
-                                            : 'Visage non configuré')
-                                        : 'Désactivé',
+                                                : 'Modèle 128D configuré (Actif)')
+                                            : 'Désactivé')
+                                        : 'Visage non configuré',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: faceEnabled && hasFaceRegistered
-                                          ? AppColors.secondary
-                                          : faceEnabled
-                                              ? const Color(0xFFF59E0B)
-                                              : AppColors.textMuted,
+                                      color: hasFaceRegistered
+                                          ? (faceEnabled
+                                              ? AppColors.secondary
+                                              : AppColors.textMuted)
+                                          : const Color(0xFFF59E0B),
                                     ),
                                   ),
                                 ],
@@ -259,7 +268,7 @@ class _BiometricSetupScreenState extends State<BiometricSetupScreen> {
                           value: faceEnabled,
                           activeThumbColor: AppColors.primary,
                           activeTrackColor: AppColors.primarySoft,
-                          onChanged: _handleToggleFace,
+                          onChanged: hasFaceRegistered ? _handleToggleFace : null,
                         ),
                       ],
                     ),

@@ -335,9 +335,9 @@ class _UserDetailsScreenState extends State<UserDetailsScreen>
           const Divider(),
           _buildDetailRow(
             label: 'Sécurité Biométrique',
-            value: (user.biometricFaceEnabled || user.hasFaceRegistered)
+            value: (user.biometricFaceEnabled && user.hasFaceRegistered)
                 ? 'Face ID (Activé)'
-                : 'Désactivé',
+                : (user.hasFaceRegistered ? 'Face ID (Désactivé)' : 'Désactivé'),
           ),
           if (user.hasFaceRegistered) ...[
             const Divider(),
@@ -373,9 +373,11 @@ class _UserDetailsScreenState extends State<UserDetailsScreen>
           _buildActivityItem(
             icon: Icons.face_retouching_natural_rounded,
             title: 'Sécurité biométrique Face ID',
-            time: (user.biometricFaceEnabled || user.hasFaceRegistered)
-                ? 'Modèle Face ID 128D configuré'
-                : 'Face ID non activé',
+            time: (user.biometricFaceEnabled && user.hasFaceRegistered)
+                ? 'Modèle Face ID 128D actif'
+                : (user.hasFaceRegistered
+                    ? 'Modèle Face ID configuré (désactivé)'
+                    : 'Face ID non activé'),
           ),
         ],
       ),

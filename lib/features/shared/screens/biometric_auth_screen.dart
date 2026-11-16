@@ -306,14 +306,16 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       }
 
       final hasBio = user != null &&
-          (user.biometricFaceEnabled || user.hasFaceRegistered);
+          user.biometricFaceEnabled &&
+          user.hasFaceRegistered;
 
       if (user == null || !hasBio) {
         if (!silent) {
           setState(() {
             _isSuccess = false;
-            _statusMessage =
-                'Face ID n\'est pas configuré pour ce compte. Connectez-vous avec votre mot de passe puis configurez Face ID.';
+            _statusMessage = (user != null && user.hasFaceRegistered)
+                ? 'Face ID est désactivé pour ce compte. Connectez-vous avec votre mot de passe pour le réactiver.'
+                : 'Face ID n\'est pas configuré pour ce compte. Connectez-vous avec votre mot de passe puis configurez Face ID.';
           });
           _animController.stop();
         }
@@ -323,8 +325,9 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
     }
 
     // Aucun e-mail saisi : si un seul utilisateur est éligible, on le propose
-    final candidates = context.users.allUsers.where((u) =>
-        u.biometricFaceEnabled || u.hasFaceRegistered).toList();
+    final candidates = context.users.allUsers
+        .where((u) => u.biometricFaceEnabled && u.hasFaceRegistered)
+        .toList();
     if (candidates.length == 1) {
       return candidates.first.email;
     }
@@ -487,8 +490,9 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       targetUser = context.auth.currentUser;
       // Aucun e-mail saisi : si un seul visage est enregistré, on l'utilise.
       if (targetUser == null) {
-        final registered =
-            context.users.allUsers.where((u) => u.hasFaceRegistered).toList();
+        final registered = context.users.allUsers
+            .where((u) => u.hasFaceRegistered && u.biometricFaceEnabled)
+            .toList();
         if (registered.length == 1) targetUser = registered.first;
       }
     }
@@ -504,18 +508,22 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       return;
     }
 
-    // Sécurité : sans visage enregistré, aucun scan ne peut être validé.
-    if (!targetUser.hasFaceRegistered) {
+    final safeUser = targetUser;
+
+    // Sécurité : sans visage enregistré ou si Face ID désactivé, aucun scan ne peut être validé.
+    if (!safeUser.hasFaceRegistered || !safeUser.biometricFaceEnabled) {
       setState(() {
         _isVerifying = false;
         _isSuccess = false;
-        _statusMessage = 'Aucun visage n\'est enregistré pour ce compte.';
+        _statusMessage = !safeUser.hasFaceRegistered
+            ? 'Aucun visage n\'est enregistré pour ce compte.'
+            : 'Face ID est actuellement désactivé pour ce compte.';
       });
       return;
     }
 
     final comp = faceService.compareFaces(
-      storedEmbedding: targetUser.faceEmbedding!,
+      storedEmbedding: safeUser.faceEmbedding!,
       liveEmbedding: result.faceEmbeddingJson!,
     );
 
@@ -848,43 +856,6 @@ class _BiometricAuthScreenState extends State<BiometricAuthScreen>
       corner(bottom: true, left: true),
       corner(bottom: true, right: true),
     ];
-  }
-
-  /// Widget visuel dédié à l'empreinte digitale (pas de caméra)
-  Widget _buildFingerprintWidget(Color glowColor) {
-    return AnimatedBuilder(
-      animation: _animController,
-      builder: (context, child) {
-        final pulse = 0.85 + 0.15 * _animController.value;
-        return Container(
-          width: 200,
-          height: 200,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
-            shape: BoxShape.circle,
-            border: Border.all(color: glowColor, width: 2.5),
-            boxShadow: [
-              BoxShadow(
-                color: glowColor.withValues(alpha: 0.4 * pulse),
-                blurRadius: 32 * pulse,
-                spreadRadius: 4 * pulse,
-              ),
-            ],
-          ),
-          child: Center(
-            child: Icon(
-              Icons.fingerprint_rounded,
-              size: 90,
-              color: _isSuccess == true
-                  ? AppColors.secondary
-                  : _isSuccess == false
-                      ? AppColors.error
-                      : glowColor.withValues(alpha: 0.7 + 0.3 * pulse),
-            ),
-          ),
-        );
-      },
-    );
   }
 
   /// Aperçu visuel facial sur mobile (état initial neutre ou photo capturée)

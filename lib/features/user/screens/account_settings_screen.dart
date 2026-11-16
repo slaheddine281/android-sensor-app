@@ -249,9 +249,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       );
     }
 
-    final biometricSummary = (user.biometricFaceEnabled || user.hasFaceRegistered)
-        ? 'Face ID activé'
-        : 'Désactivé';
+    final biometricSummary =
+        (user.biometricFaceEnabled && user.hasFaceRegistered)
+            ? 'Face ID activé'
+            : (user.hasFaceRegistered
+                ? 'Configuré (désactivé)'
+                : 'Désactivé');
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.navyDark : AppColors.background,
